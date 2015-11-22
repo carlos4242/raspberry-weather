@@ -11,7 +11,7 @@ This project runs fine on a pi with node and npm.  Get yourself a pi2, install n
 
 Nextly, go to http://forecast.io/, check that you can get the forecast for your area, get the latitude/longitude values and sign up as a developer to get an API key https://developer.forecast.io/.
 
-Modify your config.json in the project this way...
+Create your config.json in the project director like this...
 {
  "key":"<put your dark sky api key in here>",
  "latitude":<put your latitude in here>,
