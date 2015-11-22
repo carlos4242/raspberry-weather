@@ -1,3 +1,5 @@
+#! /usr/bin/node
+
 // poll the weather service
 // look for sunshine, clouds, rain, alerts, night and day
 var http = require('https');
@@ -42,7 +44,6 @@ function finish() {
 	var weather = JSON.parse(data);
 	var alerts = weather.alerts;
 	var today = weather.daily.data[0];
-	console.log(JSON.stringify(today));
 	var cloudCover = today.cloudCover;
 	var pp = today.precipProbability;
 	var sunrise = today.sunriseTime;
