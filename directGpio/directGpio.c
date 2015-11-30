@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <signal.h>
 
-void sigInt(void);
+void sigInt(int signal);
 bool keepRunning = true;
 bool mark = 1000;
 bool space = 3000;
@@ -52,4 +52,8 @@ int main(int argc,char **argv)
   GPIO_CLR = 1 << pin;
 
   return 0; 
+}
+
+void sigInt(int signal) {
+  keepRunning = false;
 }
