@@ -5,6 +5,8 @@
 
 var http = require('https');
 var fs = require('fs');
+var gpio = require('rpi-gpio');
+
 
 var flags = process.argv[2];
 var config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
@@ -14,8 +16,13 @@ var weatherUrl = "https://api.forecast.io/forecast/"+config.key+"/"+config.latit
 var finished = false;
 var data = "";
 var waitedCount = 0;
+var whitePin = 21;
+var bluePin = 25;
 
 const outputFilename = "weather.txt";
+
+gpio.setup(whitePin, gpio.DIR_OUT);
+gpio.setup(bluePin, gpio.DIR_OUT);
 
 var clientRequest = http.get(weatherUrl).on('error', function(e) {
 	console.log("Got error: " + e.message);
@@ -30,6 +37,14 @@ clientRequest.on('response', function(res2) {
 	});
 });
 
+function writePin(pin,value) {
+    gpio.write(pin, value, function(err) {
+        if (err) console.log('error writing to pin '+pin+' value '+value+' error '+err);
+//throw err;
+        //console.log('Written to pin');
+    });
+}
+
 function waitToFinish() {
 	if (finished) {
 		finish();
@@ -43,6 +58,13 @@ function waitToFinish() {
 			}
 		},100);
 	}
+}
+
+function writeSpecialPrecipitation(snow,hail,frost) {
+	// write out GPIO lamps to show snow, hail and frost
+	// snow is solid white, frost turns on the blue, hail is flashing white
+	writePin(bluePin,true);
+	writePin(whitePin,true);
 }
 
 function finish() {
@@ -61,6 +83,7 @@ function finish() {
 	var sleet = precip && pt == 'sleet';
 	var snow = precip && pt == 'snow';
 	var hail = precip && pt == 'hail';
+	var icyPrecipitation = sleet|snow|hail;
 	var alert = alerts != undefined;
 	var now = Math.floor(Date.now() / 1000);
 	var daytime = now > sunrise && now < sunset;
@@ -68,8 +91,10 @@ function finish() {
 	// output is
 	// cloud, sun, rain, alert, moon, daytime, sleet, snow, hail
 	// like 110011000
-	var output = (cloudy?"1":"0") + (sunny?"1":"0") + (rain?"1":"0") + (alert?"1":"0") + (moon?"1":"0") + (daytime?"1":"0") + (sleet?"1":"0") + (snow?"1":"0") + (hail?"1":"0")
+	var output = (cloudy?"1":"0") + (sunny?"1":"0") + ((rain||sleet)?"1":"0") + (alert?"1":"0") + (moon?"1":"0") + (daytime?"1":"0") + (icyPrecipitation?"1":"0");
 	fs.writeFileSync(outputFilename,output);
+
+	writeSpecialPrecipitation(snow,hail,false);
 
 	if (flags == 'today') {
 		console.log(JSON.stringify(today, null, 2));	
