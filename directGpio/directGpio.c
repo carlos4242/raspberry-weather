@@ -1,5 +1,7 @@
 #include "PJ_RPI.h"
 #include <stdio.h>
+#include <stdbool.h>
+#include <signal.h>
 
 void sigInt(void);
 bool keepRunning = true;
