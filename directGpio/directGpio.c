@@ -2,11 +2,12 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <math.h>
 
 void sigInt(int signal);
 bool keepRunning = true;
-bool mark = 1000;
-bool space = 3000;
+useconds_t mark = 1000;
+useconds_t space = 3000;
 int pin = 21;
 
 int main(int argc,char **argv)
@@ -19,18 +20,21 @@ int main(int argc,char **argv)
     return -1;
   }
 
-  if (argc > 2 && strncmp(argv[1],"-p",2) == 0) {
-    // read the pin
-    printf("Using pin number %s\n",argv[2]);
-    pin = atoi(argv[2]);
-    if (pin < 0 || pin > 27) {
-      pin = 21;
-    }
-
-    if (argc > 3) {
-      float spaceRatio = atof(argv[3]);
+  for (int a=1;a<argc-1;a+=2) {
+    if (a+1>=argc) break;
+    if (strncmp(argv[a],"-p",2)==0) {
+      // read the pin
+      printf("Using pin number %s\n",argv[a+1]);
+      pin = atoi(argv[a+1]);
+      if (pin < 0 || pin > 27) {
+        pin = 21;
+      }
+    } else
+    if (strncmp(argv[a],"-s",2)==0) {
+      float spaceRatio = atof(argv[a+1]);
       if (!isnan(spaceRatio) && spaceRatio > 0) {
         space = spaceRatio * mark;
+	printf("mark %d, space %d\n",mark,space);
       }
     }
   }

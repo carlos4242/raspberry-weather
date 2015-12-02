@@ -1,5 +1,5 @@
 all: directGpio
 directGpio: directGpio.c
-	gcc $^ -lPJ_RPI -o $@
+	gcc -std=gnu99 $^ -lPJ_RPI -o $@
 clean:
-	rm *.o
+	rm -f *.o
