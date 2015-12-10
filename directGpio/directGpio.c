@@ -16,6 +16,28 @@ void showHelp(char * basename) {
   printf("-p <pin>, 0-25, default is 21\n");
 }
 
+void *flasher(void *argument)
+{
+   // int passed_in_value;
+   // passed_in_value = *((int *) argument);
+   // printf("Hello World! It's me, thread with argument %d!\n", passed_in_value);
+ 
+  /* optionally: insert more useful stuff here */
+  while(keepRunning)
+  {
+    // Toggle pin 7 (blink a led!)
+    GPIO_SET = 1 << pin;
+    usleep(mark);
+ 
+    GPIO_CLR = 1 << pin;
+    usleep(space);
+  }
+
+  GPIO_CLR = 1 << pin;
+ 
+  return NULL;
+}
+
 int main(int argc,char **argv)
 {
   signal(SIGINT,sigInt);
@@ -46,7 +68,7 @@ int main(int argc,char **argv)
         float spaceRatio = atof(argv[a+1]);
         if (!isnan(spaceRatio) && spaceRatio > 0) {
           space = spaceRatio * mark;
-	  printf("mark %d, space %d\n",mark,space);
+	        printf("mark %d, space %d\n",mark,space);
         } else {
           printf("cannot interpret space ratio %0.2f\n",spaceRatio);
         }
