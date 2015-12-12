@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <signal.h>
 #include <math.h>
+#include <pthread.h>
+#include <assert.h>
 
 void sigInt(int signal);
 bool keepRunning = true;
@@ -104,7 +106,11 @@ int main(int argc,char **argv)
   INP_GPIO(pin);
   OUT_GPIO(pin);
 
-  result_code = pthread_create(&threads[index], NULL, perform_work, (void *) &thread_args[index]);
+  pthread_t flasher_thread,flasher_control_thread;
+
+  int result_code = pthread_create(&flasher_thread, NULL, flasher, NULL);
+  assert(0 == result_code);
+  // result_code = pthread_create(&flasher_control_thread, NULL, flasherctl, NULL);
   assert(0 == result_code);
 
   while(keepRunning) {
