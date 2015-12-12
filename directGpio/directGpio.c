@@ -9,6 +9,7 @@ bool keepRunning = true;
 useconds_t mark = 1;
 useconds_t space = 3;
 int pin = 21;
+const char * flasherPipe = "/var/run/flasher";
 
 void showHelp(char * basename) {
   printf("Usage: %s [parameters]\n");
@@ -21,6 +22,8 @@ void *flasher(void *argument)
    // int passed_in_value;
    // passed_in_value = *((int *) argument);
    // printf("Hello World! It's me, thread with argument %d!\n", passed_in_value);
+
+  // /var/run/flasher
  
   /* optionally: insert more useful stuff here */
   while(keepRunning)
@@ -35,6 +38,27 @@ void *flasher(void *argument)
 
   GPIO_CLR = 1 << pin;
  
+  return NULL;
+}
+
+#define MAX_BUF 1024
+
+void doControlMessage(char * message) {
+  printf("received control message %s\n",message);
+}
+
+void *flasherctl(void *arg) {
+  char buf[MAX_BUF];
+  int flasherfd = open(flasherPipe,O_RDONLY);
+  while (keepRunning) {
+    int read = read(flasherfd,buf,MAX_BUF);
+    printf("read %d bytes from pipe...\n", read);
+    if (read) {
+      buf[read] = 0;
+      doControlMessage(buf);
+    }
+  }
+  close(flasherfd);
   return NULL;
 }
 
@@ -80,17 +104,11 @@ int main(int argc,char **argv)
   INP_GPIO(pin);
   OUT_GPIO(pin);
 
-  while(keepRunning)
-  {
-    // Toggle pin 7 (blink a led!)
-    GPIO_SET = 1 << pin;
-    usleep(mark);
- 
-    GPIO_CLR = 1 << pin;
-    usleep(space);
-  }
+  result_code = pthread_create(&threads[index], NULL, perform_work, (void *) &thread_args[index]);
+  assert(0 == result_code);
 
-  GPIO_CLR = 1 << pin;
+  while(keepRunning) {
+  }
 
   return 0; 
 }
