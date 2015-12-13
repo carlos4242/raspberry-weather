@@ -47,6 +47,17 @@ void *flasher(void *argument)
 
 void doControlMessage(char * message) {
   printf("received control message %s\n",message);
+  if (strncmp(message,"s:",2)) {
+    message += 2;
+    message[10] = 0;
+    float spaceRatio = atof(message);
+    if (!isnan(spaceRatio) && spaceRatio > 0) {
+      space = spaceRatio * mark;
+      printf("mark %d, space %d\n",mark,space);
+    } else {
+      printf("cannot interpret space ratio %0.2f\n",spaceRatio);
+    }
+  }
 }
 
 void *flasherctl(void *arg) {
@@ -54,7 +65,6 @@ void *flasherctl(void *arg) {
   int flasherfd = open(flasherPipe,O_RDONLY);
   while (keepRunning) {
     int r = read(flasherfd,buf,MAX_BUF);
-    printf("read %d bytes from pipe...\n", r);
     if (r) {
       buf[r] = 0;
       doControlMessage(buf);
