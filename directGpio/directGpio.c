@@ -53,10 +53,10 @@ void *flasherctl(void *arg) {
   char buf[MAX_BUF];
   int flasherfd = open(flasherPipe,O_RDONLY);
   while (keepRunning) {
-    int read = read(flasherfd,buf,MAX_BUF);
-    printf("read %d bytes from pipe...\n", read);
-    if (read) {
-      buf[read] = 0;
+    int r = read(flasherfd,buf,MAX_BUF);
+    printf("read %d bytes from pipe...\n", r);
+    if (r) {
+      buf[r] = 0;
       doControlMessage(buf);
     }
   }
@@ -110,7 +110,7 @@ int main(int argc,char **argv)
 
   int result_code = pthread_create(&flasher_thread, NULL, flasher, NULL);
   assert(0 == result_code);
-  // result_code = pthread_create(&flasher_control_thread, NULL, flasherctl, NULL);
+  result_code = pthread_create(&flasher_control_thread, NULL, flasherctl, NULL);
   assert(0 == result_code);
 
   while(keepRunning) {
