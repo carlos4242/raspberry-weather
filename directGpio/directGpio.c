@@ -21,13 +21,6 @@ void showHelp(char * basename) {
 
 void *flasher(void *argument)
 {
-   // int passed_in_value;
-   // passed_in_value = *((int *) argument);
-   // printf("Hello World! It's me, thread with argument %d!\n", passed_in_value);
-
-  // /var/run/flasher
- 
-  /* optionally: insert more useful stuff here */
   while(keepRunning)
   {
     // Toggle pin 7 (blink a led!)
@@ -47,7 +40,7 @@ void *flasher(void *argument)
 
 void doControlMessage(char * message) {
   printf("received control message %s\n",message);
-  if (strncmp(message,"s:",2)) {
+  if (strncmp(message,"s:",2)==0) {
     message += 2;
     message[10] = 0;
     float spaceRatio = atof(message);
