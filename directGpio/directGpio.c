@@ -117,9 +117,11 @@ void *flasherctl(void *arg) {
   return NULL;
 }
 
+const unsigned char activePins[] = {21,25}; // to avoid being wasteful of resource, only create threads for pins that are actually wired up, unlikely to be all 26!
+#define is_active_pin(pin) (pin == activePins[0] || pin == activePins[1])
+
 int main(int argc,char **argv)
 {
-  const unsigned char activePins[] = {21,25}; // to avoid being wasteful of resource, only create threads for pins that are actually wired up, unlikely to be all 26!
 
   signal(SIGINT,sigInt);
 
@@ -143,7 +145,7 @@ int main(int argc,char **argv)
   // then create one flasher for each pin we will use
   unsigned char pinNumbers[NUM_PINS];
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
-    if (pin == activePins[0] || pin == activePins[1]) { // hack while we only have 2 LEDs, upgrade later
+    if (is_active_pin(pin)) { // hack while we only have 2 LEDs, upgrade later
       pinNumbers[pin] = pin;
       int pin_thread_success = pthread_create(&flashers[pin], NULL, flasherctl, (void*)&pinNumbers[pin]);
       assert(0 == pin_thread_success);
@@ -152,6 +154,16 @@ int main(int argc,char **argv)
   }
 
   while(keepRunning) {
+  }
+
+  pthread_join(flasher_control_thread,NULL);
+  printf("control thread done\n");
+
+  for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
+    if (is_active_pin(pin)) { // hack while we only have 2 LEDs, upgrade later
+      pthread_join(flashers[pin],NULL);
+      printf("thread %d done\n",pin);
+    }
   }
 
   return 0; 
