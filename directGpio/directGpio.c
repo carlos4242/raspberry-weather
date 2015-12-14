@@ -35,7 +35,7 @@ useconds_t flashRates[NUM_PINS] = {0};
 void *flasher(void *pptr)
 {
   unsigned char pin = *((unsigned char*)pptr);
-  printf("started thread for pin %d (at %p)\n",pin,pptr);
+  printf("started thread for pin %d\n",pin);
   while(keepRunning)
   {
     useconds_t mark = brightness[pin];
