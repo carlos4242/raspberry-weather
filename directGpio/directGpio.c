@@ -157,6 +157,7 @@ int main(int argc,char **argv)
           buf[r] = 0;
           doControlMessage(buf);
         }
+        usleep(10000); // reduce CPU load
       }
       if (close(flasherfd)) {
         perror("failed to close fifo");
