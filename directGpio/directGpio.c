@@ -7,7 +7,8 @@
 #include <assert.h>
 
 #define CMD_BUF 1024
-#define NUM_PINS 25
+#define NUM_PINS 26
+#define MIN_PIN 1
 #define flasherPipe "/var/run/flasher"
 
 void sigInt(int signal);
@@ -24,14 +25,11 @@ void showHelp(char * basename) {
 }
 
 const useconds_t dutyCycle = 256;
-// useconds_t mark = 1;
-// useconds_t space = 255;
-// const unsigned char pin = 21;
 
 // one thread for each pin to be PWMed
-pthread_t flashers[NUM_PINS];
-useconds_t marks[NUM_PINS] = {0};
-useconds_t spaces[NUM_PINS] = {0};
+pthread_t flasher_threads[NUM_PINS];
+
+unsigned char brightness[NUM_PINS] = {0};
 useconds_t flashRates[NUM_PINS] = {0};
 
 void *flasher(void *pptr)
@@ -40,10 +38,10 @@ void *flasher(void *pptr)
   printf("started thread for pin %d (at %p)\n",pin,pptr);
   while(keepRunning)
   {
-    useconds_t mark = marks[pin];
-    useconds_t space = spaces[pin];
+    useconds_t mark = brightness[pin];
+    useconds_t space = dutyCycle - mark;
     useconds_t flashRate = flashRates[pin];
-    if (!mark && !space && !flashRate) {
+    if (!mark && !flashRate) {
       usleep(dutyCycle);
     } else {
       if (flashRate) {
@@ -77,17 +75,18 @@ void doControlMessage(char * message) {
       strncpy(pinBuf,message,2);
       unsigned char pin = atoi(pinBuf);
       printf("adjusting pin %s / %d\n",pinBuf,pin);
-      if (pin) {
+      if (pin >= MIN_PIN && pin < NUM_PINS) {
         // for now, pin 0 is invalid, fix this later if needed
         // Define pin as output
         INP_GPIO(pin);
         OUT_GPIO(pin);
         message += 3;
-        unsigned char brightness = atoi(message);
-        printf("message is %s, interpreted as brightness %d\n",message,brightness);
-        marks[pin] = brightness;
-        spaces[pin] = dutyCycle - brightness;
+        unsigned char newBrightness = atoi(message);
+        printf("message is %s, interpreted as brightness %d\n",message,newBrightness);
+        brightness[pin] = newBrightness;
         // printf("mark %d, space %d\n",mark,space);
+      } else {
+        printf("invalid pin %d",pin);
       }
     } else {
       printf("invalid length control message - should be s:XX:YYY was %d - %s\n",strnlen(message,6),message);
@@ -111,7 +110,7 @@ void *flasherctl(void *arg) {
 
 int main(int argc,char **argv)
 {
-  const unsigned char activePins[] = {21,25};
+  const unsigned char activePins[] = {21,25}; // to avoid being wasteful of resource, only create threads for pins that are actually wired up, unlikely to be all 26!
 
   signal(SIGINT,sigInt);
 
@@ -134,8 +133,8 @@ int main(int argc,char **argv)
 
   // then create one flasher for each pin we will use
   unsigned char pinNumbers[NUM_PINS];
-  for (unsigned char pin = 0;pin<NUM_PINS;pin++) {
-    if (pin == activePins[0] || pin == activePins[1]) {
+  for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
+    if (pin == activePins[0] || pin == activePins[1]) { // hack while we only have 2 LEDs, upgrade later
       pinNumbers[pin] = pin;
       int pin_thread_success = pthread_create(&flashers[pin], NULL, flasherctl, (void*)&pinNumbers[pin]);
       assert(0 == pin_thread_success);
