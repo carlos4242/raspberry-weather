@@ -9,10 +9,9 @@
 
 #define CMD_BUF 1024
 #define NUM_PINS 26
-#define MIN_PIN 1
-#define flasherPipe "/var/run/flasher"
+#define MIN_PIN 1 // for now, pin 0 is invalid, fix this later if needed
+#define flasherPipe "/tmp/flasher"
 
-void sigInt(int signal);
 bool keepRunning = true;
 
 void sigInt(int signal) {
@@ -68,7 +67,9 @@ void *flasher(void *pptr)
 }
 
 void doControlMessage(char * message) {
-  if (strncmp(message,"s:",2)==0) { // structure is s:XX:YYY, where XX is the pin number and YYY is the brightness (0-255)
+  bool steadyMsg = strncmp(message,"s:",2) == 0; // structure is s:XX:YYY, where XX is the pin number and YYY is the brightness (0-255)
+  bool flashMsg = strncmp(message,"f:",2) == 0; // structure is f:XX:YYY, where XX is the pin number and YYY is the flashing speed (0-255)
+  if (steadyMsg||flashMsg) { 
     printf("received control message %s\n",message);
     message += 2;
     message[6] = 0;
@@ -78,15 +79,11 @@ void doControlMessage(char * message) {
       unsigned char pin = atoi(pinBuf);
       printf("adjusting pin %s / %d\n",pinBuf,pin);
       if (pin >= MIN_PIN && pin < NUM_PINS) {
-        // for now, pin 0 is invalid, fix this later if needed
-        // Define pin as output
-        INP_GPIO(pin);
-        OUT_GPIO(pin);
+        INP_GPIO(pin); OUT_GPIO(pin); // Define pin as output
         message += 3;
         unsigned char newBrightness = atoi(message);
         printf("message is %s, interpreted as brightness %d\n",message,newBrightness);
         brightness[pin] = newBrightness;
-        // printf("mark %d, space %d\n",mark,space);
       } else {
         printf("invalid pin %d",pin);
       }
@@ -127,7 +124,7 @@ void *flasherctl(void *arg) {
 }
 
 const unsigned char activePins[] = {21,25}; // to avoid being wasteful of resource, only create threads for pins that are actually wired up, unlikely to be all 26!
-#define is_active_pin(pin) (pin == activePins[0] || pin == activePins[1])
+#define is_active_pin(pin) (pin == activePins[0] || pin == activePins[1]) // hack while we only have 2 LEDs, upgrade later
 
 int main(int argc,char **argv)
 {
@@ -173,7 +170,7 @@ int main(int argc,char **argv)
   printf("preparing to shut down...\n");
   
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
-    if (is_active_pin(pin)) { // hack while we only have 2 LEDs, upgrade later
+    if (is_active_pin(pin)) {
       pthread_join(flasher_threads[pin],NULL);
       printf("thread %d done\n",pin);
     }
