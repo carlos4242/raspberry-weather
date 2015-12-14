@@ -97,9 +97,10 @@ void doControlMessage(char * message) {
 
 void *flasherctl(void *arg) {
   char buf[CMD_BUF];
-  if (mkfifo(flasherPipe,0777)) {
+  if (!mkfifo(flasherPipe,0777)) {
     int flasherfd = open(flasherPipe,O_RDONLY);
     if (flasherfd > 0) {
+      printf("Listening on %s...\n",flasherPipe);
       while (keepRunning) {
         int r = read(flasherfd,buf,CMD_BUF);
         if (r>0) {
@@ -142,7 +143,6 @@ int main(int argc,char **argv)
   pthread_t flasher_control_thread;
   int cntrl_success = pthread_create(&flasher_control_thread, NULL, flasherctl, NULL);
   assert(0 == cntrl_success);
-  printf("Listening on %s...\n",flasherPipe);
 
   // then create one flasher for each pin we will use
   unsigned char pinNumbers[NUM_PINS];
@@ -158,15 +158,17 @@ int main(int argc,char **argv)
   while(keepRunning) {
   }
 
-  pthread_join(flasher_control_thread,NULL);
-  printf("control thread done\n");
-
+  printf("preparing to shut down...\n");
+  
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
     if (is_active_pin(pin)) { // hack while we only have 2 LEDs, upgrade later
       pthread_join(flasher_threads[pin],NULL);
       printf("thread %d done\n",pin);
     }
   }
+
+  pthread_join(flasher_control_thread,NULL);
+  printf("control thread done\n");
 
   return 0; 
 }
