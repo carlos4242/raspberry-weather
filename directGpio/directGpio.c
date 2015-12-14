@@ -136,7 +136,7 @@ int main(int argc,char **argv)
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
     if (pin == activePins[0] || pin == activePins[1]) { // hack while we only have 2 LEDs, upgrade later
       pinNumbers[pin] = pin;
-      int pin_thread_success = pthread_create(&flashers[pin], NULL, flasherctl, (void*)&pinNumbers[pin]);
+      int pin_thread_success = pthread_create(&flasher_threads[pin], NULL, flasherctl, (void*)&pinNumbers[pin]);
       assert(0 == pin_thread_success);
       printf("created thread for pin %d\n",pinNumbers[pin]);
     }
