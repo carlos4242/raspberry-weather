@@ -32,6 +32,7 @@ const useconds_t dutyCycle = 256;
 pthread_t flashers[NUM_PINS];
 useconds_t marks[NUM_PINS] = {0};
 useconds_t spaces[NUM_PINS] = {0};
+useconds_t flashRates[NUM_PINS] = {0};
 
 void *flasher(void *pptr)
 {
@@ -41,9 +42,14 @@ void *flasher(void *pptr)
   {
     useconds_t mark = marks[pin];
     useconds_t space = spaces[pin];
-    if (!mark && !space) {
+    useconds_t flashRate = flashRates[pin];
+    if (!mark && !space && !flashRate) {
       usleep(dutyCycle);
     } else {
+      if (flashRate) {
+
+      }
+      
       if (mark) {
         GPIO_SET = 1 << pin;
         usleep(mark);
