@@ -68,8 +68,8 @@ void *flasher(void *pptr)
 }
 
 void doControlMessage(char * message) {
-  printf("received control message %s\n",message);
   if (strncmp(message,"s:",2)==0) { // structure is s:XX:YYY, where XX is the pin number and YYY is the brightness (0-255)
+    printf("received control message %s\n",message);
     message += 2;
     message[6] = 0;
     if (strnlen(message,6)==6) {
@@ -128,8 +128,8 @@ int main(int argc,char **argv)
 
   // first create the fifo listener
   pthread_t flasher_control_thread;
-  result_code = pthread_create(&flasher_control_thread, NULL, flasherctl, NULL);
-  assert(0 == result_code);
+  int cntrl_success = pthread_create(&flasher_control_thread, NULL, flasherctl, NULL);
+  assert(0 == cntrl_success);
   printf("Listening on %s...\n",flasherPipe);
 
   // then create one flasher for each pin we will use
@@ -137,9 +137,9 @@ int main(int argc,char **argv)
   for (unsigned char pin = 0;pin<NUM_PINS;pin++) {
     if (pin == activePins[0] || pin == activePins[1]) {
       pinNumbers[pin] = pin;
-      result_code = pthread_create(&flashers[pin], NULL, flasherctl, (void*)&pinNumbers[pin]);
+      int pin_thread_success = pthread_create(&flashers[pin], NULL, flasherctl, (void*)&pinNumbers[pin]);
+      assert(0 == pin_thread_success);
       printf("created thread for pin %d\n",pinNumbers[pin]);
-      assert(0 == result_code);
     }
   }
 
