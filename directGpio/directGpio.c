@@ -96,15 +96,24 @@ void doControlMessage(char * message) {
 
 void *flasherctl(void *arg) {
   char buf[CMD_BUF];
-  int flasherfd = open(flasherPipe,O_RDONLY);
-  while (keepRunning) {
-    int r = read(flasherfd,buf,CMD_BUF);
-    if (r) {
-      buf[r] = 0;
-      doControlMessage(buf);
+  if (mkfifo(flasherPipe,0777)) {
+    int flasherfd = open(flasherPipe,O_RDONLY);
+    if (flasherfd > 0) {
+      while (keepRunning) {
+        int r = read(flasherfd,buf,CMD_BUF);
+        if (r>0) {
+          buf[r] = 0;
+          doControlMessage(buf);
+        }
+      }
+      close(flasherfd);
+    } else {
+      perror("failed to open fifo");
     }
+    unlink(flasherPipe);
+  } else {
+    perror("failed to create fifo");
   }
-  close(flasherfd);
   return NULL;
 }
 
