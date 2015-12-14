@@ -5,6 +5,7 @@
 #include <math.h>
 #include <pthread.h>
 #include <assert.h>
+#include <errno.h>
 
 #define CMD_BUF 1024
 #define NUM_PINS 26
@@ -97,7 +98,8 @@ void doControlMessage(char * message) {
 
 void *flasherctl(void *arg) {
   char buf[CMD_BUF];
-  if (!mkfifo(flasherPipe,0777)) {
+  int fifo_create_success = mkfifo(flasherPipe,0777);
+  if (fifo_create_success == 0 || errno == EEXIST) {
     int flasherfd = open(flasherPipe,O_RDONLY);
     if (flasherfd > 0) {
       printf("Listening on %s...\n",flasherPipe);
@@ -108,11 +110,15 @@ void *flasherctl(void *arg) {
           doControlMessage(buf);
         }
       }
-      close(flasherfd);
+      if (close(flasherfd)) {
+        perror("failed to close fifo");
+      }
     } else {
       perror("failed to open fifo");
     }
-    unlink(flasherPipe);
+    if (unlink(flasherPipe)) {
+      perror("failed to cleanup fifo");
+    }
   } else {
     perror("failed to create fifo");
   }
@@ -125,8 +131,14 @@ const unsigned char activePins[] = {21,25}; // to avoid being wasteful of resour
 
 int main(int argc,char **argv)
 {
-
-  signal(SIGINT,sigInt);
+  // signal(SIGINT,sigInt);
+  struct sigaction new_action, old_action;
+  new_action.sa_handler = sigInt;
+  sigemptyset (&new_action.sa_mask);
+  new_action.sa_flags = 0;
+  sigaction (SIGINT, NULL, &old_action);
+  if (old_action.sa_handler != SIG_IGN)
+    sigaction (SIGINT, &new_action, NULL);
 
   if(map_peripheral(&gpio) == -1) 
   {
