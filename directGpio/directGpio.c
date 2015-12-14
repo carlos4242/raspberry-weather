@@ -9,7 +9,7 @@
 #define CMD_BUF 1024
 #define NUM_PINS 26
 #define MIN_PIN 1
-#define flasherPipe "/var/run/flasher"
+#define flasherPipe "/tmp/flasher"
 
 void sigInt(int signal);
 bool keepRunning = true;
@@ -97,7 +97,7 @@ void doControlMessage(char * message) {
 
 void *flasherctl(void *arg) {
   char buf[CMD_BUF];
-  if (mkfifo(flasherPipe,0777)) {
+  if (mkfifo(flasherPipe,0777) == 0) {
     int flasherfd = open(flasherPipe,O_RDONLY);
     if (flasherfd > 0) {
       while (keepRunning) {
