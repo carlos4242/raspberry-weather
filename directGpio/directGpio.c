@@ -22,21 +22,10 @@ void showHelp(char * basename) {
   printf("YYY - brightness 0-255\n");
 }
 
-bool activePins[26] = { 0 };
-
-const useconds_t dutyCycle = 1000;
-unsigned char brightness = 100; // 0-255 
+const useconds_t dutyCycle = 256;
 useconds_t mark = 1;
-useconds_t space = dutyCycle - mark;
+useconds_t space = 255;
 const unsigned char pin = 21;
-
-void shutdownPins() {
-  for (int i = 0;i<26;i++) {
-    if (activePins[i]) {
-      GPIO_CLR = 1 << i;
-    }
-  }
-}
 
 void *flasher(void *argument)
 {
@@ -53,7 +42,7 @@ void *flasher(void *argument)
     }
   }
 
-  shutdownPins(); // this could be done more efficiently with one call to clear the register but we'd need to poke into the innards of this helper library/macro... can't be bothered
+  GPIO_CLR = 1 << 26 -1;
  
   return NULL;
 }
@@ -62,22 +51,26 @@ void doControlMessage(char * message) {
   printf("received control message %s\n",message);
   if (strncmp(message,"s:",2)==0) { // structure is s:XX:YYY, where XX is the pin number and YYY is the brightness (0-255)
     message += 2;
-    message[8] = 0;
-    if (strnlen(message,8)==8) {
-      char pinBuf[2];
-      strncpy(message,pinBuf,2);
+    message[6] = 0;
+    if (strnlen(message,6)==6) {
+      char pinBuf[3] = { 0 };
+      strncpy(pinBuf,message,2);
       unsigned char pin = atoi(pinBuf);
-      activePins[pin] = true;
-      // Define pin as output
-      INP_GPIO(pin);
-      OUT_GPIO(pin);
-      message += 3;
-      brightness = atoi(message);
-      mark = brightness ? dutyCycle / brightness : 0;
-      space = dutyCycle - mark;
-      printf("mark %d, space %d\n",mark,space);
+      printf("adjusting pin %s / %d\n",pinBuf,pin);
+      if (pin) {
+        // for now, pin 0 is invalid, fix this later if needed
+        // Define pin as output
+        INP_GPIO(pin);
+        OUT_GPIO(pin);
+        message += 3;
+        unsigned char brightness = atoi(message);
+        printf("message is %s, interpreted as brightness %d\n",message,brightness);
+        mark = brightness;
+        space = dutyCycle - mark;
+        printf("mark %d, space %d\n",mark,space);
+      }
     } else {
-      printf("invalid length control message - should be s:XX:YYY\n");
+      printf("invalid length control message - should be s:XX:YYY was %d - %s\n",strnlen(message,6),message);
     }
   }
 }
