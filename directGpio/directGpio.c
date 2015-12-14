@@ -93,35 +93,11 @@ void doControlMessage(char * message) {
   }
 }
 
-void *flasherctl(void *arg) {
-  char buf[CMD_BUF];
-  int fifo_create_success = mkfifo(flasherPipe,0777);
-  if (fifo_create_success == 0 || errno == EEXIST) {
-    printf("Waiting for messages on %s...\n",flasherPipe);
-    int flasherfd = open(flasherPipe,O_RDONLY);
-    if (flasherfd > 0) {
-      while (keepRunning) {
-        int r = read(flasherfd,buf,CMD_BUF);
-        if (r>0) {
-          buf[r] = 0;
-          doControlMessage(buf);
-        }
-      }
-      if (close(flasherfd)) {
-        perror("failed to close fifo");
-      }
-    } else {
-      perror("failed to open fifo");
-    }
-    if (unlink(flasherPipe)) {
-      perror("failed to cleanup fifo");
-    }
-  } else {
-    perror("failed to create fifo");
-  }
-  printf("flasher control thread finished\n");
-  return NULL;
-}
+// void *flasherctl(void *arg) {
+
+//   printf("flasher control thread finished\n");
+//   return NULL;
+// }
 
 const unsigned char activePins[] = {21,25}; // to avoid being wasteful of resource, only create threads for pins that are actually wired up, unlikely to be all 26!
 #define is_active_pin(pin) (pin == activePins[0] || pin == activePins[1]) // hack while we only have 2 LEDs, upgrade later
@@ -149,9 +125,9 @@ int main(int argc,char **argv)
   }
 
   // first create the fifo listener
-  pthread_t flasher_control_thread;
-  int cntrl_success = pthread_create(&flasher_control_thread, NULL, flasherctl, NULL);
-  assert(0 == cntrl_success);
+  // pthread_t flasher_control_thread;
+  // int cntrl_success = pthread_create(&flasher_control_thread, NULL, flasherctl, NULL);
+  // assert(0 == cntrl_success);
 
   // then create one flasher for each pin we will use
   unsigned char pinNumbers[NUM_PINS];
@@ -164,9 +140,34 @@ int main(int argc,char **argv)
     }
   }
 
-  while(keepRunning) {
+  // main loop, open the fifo and wait for messages or for interrupt
+  char buf[CMD_BUF];
+  int fifo_create_success = mkfifo(flasherPipe,0777);
+  if (fifo_create_success == 0 || errno == EEXIST) {
+    printf("Waiting for messages on %s...\n",flasherPipe);
+    int flasherfd = open(flasherPipe,O_RDONLY);
+    if (flasherfd > 0) {
+      while (keepRunning) {
+        int r = read(flasherfd,buf,CMD_BUF);
+        if (r>0) {
+          buf[r] = 0;
+          doControlMessage(buf);
+        }
+      }
+      if (close(flasherfd)) {
+        perror("failed to close fifo");
+      }
+    } else {
+      perror("failed to open fifo");
+    }
+    if (unlink(flasherPipe)) {
+      perror("failed to cleanup fifo");
+    }
+  } else {
+    perror("failed to create fifo");
   }
 
+  // either we couldn't open the fifo or we opened it, ran for a bit and received a shutdown...
   printf("preparing to shut down...\n");
   
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
@@ -176,8 +177,8 @@ int main(int argc,char **argv)
     }
   }
 
-  pthread_join(flasher_control_thread,NULL);
-  printf("control thread done\n");
+  // pthread_join(flasher_control_thread,NULL);
+  // printf("control thread done\n");
 
   return 0; 
 }
