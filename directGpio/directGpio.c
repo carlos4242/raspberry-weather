@@ -163,7 +163,7 @@ int main(int argc,char **argv)
 
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
     if (is_active_pin(pin)) { // hack while we only have 2 LEDs, upgrade later
-      pthread_join(flashers[pin],NULL);
+      pthread_join(flasher_threads[pin],NULL);
       printf("thread %d done\n",pin);
     }
   }
