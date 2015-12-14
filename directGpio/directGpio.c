@@ -24,13 +24,14 @@ void showHelp(char * basename) {
   printf("YYY - brightness 0-255\n");
 }
 
-const useconds_t dutyCycle = 256;
+const useconds_t dutyCycle = 10000;
 
 // one thread for each pin to be PWMed
 pthread_t flasher_threads[NUM_PINS];
-
-unsigned char brightness[NUM_PINS] = {0};
 useconds_t flashRates[NUM_PINS] = {0};
+unsigned char brightness[NUM_PINS] = {0};
+
+float maxBrightness = 256;
 
 void *flasher(void *pptr)
 {
@@ -38,12 +39,15 @@ void *flasher(void *pptr)
   printf("started thread for pin %d\n",pin);
   while(keepRunning)
   {
-    useconds_t mark = brightness[pin];
-    useconds_t space = dutyCycle - mark;
-    useconds_t flashRate = flashRates[pin];
-    if (!mark && !flashRate) {
+    if (!brightness[pin] && !flashRates[pin]) {
       usleep(dutyCycle);
     } else {
+      float markPct = brightness[pin];
+      float spacePct = maxBrightness - markPct;
+      useconds_t mark = markPct / maxBrightness * dutyCycle;
+      useconds_t space = spacePct / maxBrightness * dutyCycle;
+      useconds_t flashRate = flashRates[pin];
+
       if (flashRate) {
 
       }
