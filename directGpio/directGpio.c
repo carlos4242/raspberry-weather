@@ -97,9 +97,9 @@ void *flasherctl(void *arg) {
   char buf[CMD_BUF];
   int fifo_create_success = mkfifo(flasherPipe,0777);
   if (fifo_create_success == 0 || errno == EEXIST) {
+    printf("Waiting for messages on %s...\n",flasherPipe);
     int flasherfd = open(flasherPipe,O_RDONLY);
     if (flasherfd > 0) {
-      printf("Listening on %s...\n",flasherPipe);
       while (keepRunning) {
         int r = read(flasherfd,buf,CMD_BUF);
         if (r>0) {
