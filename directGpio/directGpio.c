@@ -11,6 +11,10 @@
 #define NUM_PINS 26
 #define MIN_PIN 1 // for now, pin 0 is invalid, fix this later if needed
 #define flasherPipe "/tmp/flasher"
+#define maxBrightness 256.0
+#define minBrightness 0.0
+#define brightnessStep 1.0
+#define dutyCycle 10000
 
 bool keepRunning = true;
 
@@ -24,39 +28,55 @@ void showHelp(char * basename) {
   printf("YYY - brightness 0-255\n");
 }
 
-const useconds_t dutyCycle = 10000;
 
 // one thread for each pin to be PWMed
-pthread_t flasher_threads[NUM_PINS];
-useconds_t flashRates[NUM_PINS] = {0};
-unsigned char brightness[NUM_PINS] = {0};
 
-float maxBrightness = 256;
+typedef struct {
+  unsigned char pin;
+  pthread_t thread;
+  useconds_t flashPeriod;
+  float brightness;
+} pin_t;
+
+pin_t pins[NUM_PINS] = {0};
+
+// pthread_t flasher_threads[NUM_PINS];
+// useconds_t flashRates[NUM_PINS] = {0};
+// unsigned char brightness[NUM_PINS] = {0};
 
 void *flasher(void *pptr)
 {
-  unsigned char pin = *((unsigned char*)pptr);
-  printf("started thread for pin %d\n",pin);
-  while(keepRunning)
+  bool waxing = true;
+  pin_t *pin = (pin_t*)pptr;
+  printf("started thread for pin %d\n",pin->pin);
+  while(keepRunning) // each run of the loop should take one duty cycle... i.e. 100Hz
   {
-    if (!brightness[pin] && !flashRates[pin]) {
+    if (!pin->flashPeriod && pin->brightness<FLT_EPSILON) {
       usleep(dutyCycle);
+      GPIO_CLR = 1 << pin;
     } else {
-      float markPct = brightness[pin];
-      float spacePct = maxBrightness - markPct;
-      useconds_t mark = markPct / maxBrightness * dutyCycle;
-      useconds_t space = spacePct / maxBrightness * dutyCycle;
-      useconds_t flashRate = flashRates[pin];
-
-      if (flashRate) {
-
+      useconds_t flashRate = pin->flashPeriod;
+      useconds_t flashSteps = flashRate / dutyCycle;
+      if (flashSteps >= 10) {
+        float flashStep = (maxBrightness - minBrightness) / flashSteps;
+        pin->brightness += waxing ? flashStep : -flashStep;
+        if (pin->brightness > maxBrightness) {
+          waxing = false;
+          pin->brightness = maxBrightness;
+        } else if (pin->brightness < minBrightness) {
+          waxing = true;
+          pin->brightness = minBrightness;
+        }
       }
-      
+
+      useconds_t mark = pin->brightness / maxBrightness * dutyCycle;      
       if (mark) {
         GPIO_SET = 1 << pin;
         usleep(mark);
       }
 
+      float spacePct = maxBrightness - pin->brightness;
+      useconds_t space = spacePct / maxBrightness * dutyCycle;
       if (space) {
         GPIO_CLR = 1 << pin;
         usleep(space);
@@ -83,7 +103,8 @@ void doControlMessage(char * message) {
       unsigned char pin = atoi(pinBuf);
       printf("adjusting pin %s / %d\n",pinBuf,pin);
       if (pin >= MIN_PIN && pin < NUM_PINS) {
-        INP_GPIO(pin); OUT_GPIO(pin); // Define pin as output
+        INP_GPIO(pin);
+        OUT_GPIO(pin); // Define pin as output
         message += 3;
         unsigned char newBrightness = atoi(message);
         printf("message is %s, interpreted as brightness %d\n",message,newBrightness);
@@ -114,8 +135,9 @@ int main(int argc,char **argv)
   sigemptyset (&new_action.sa_mask);
   new_action.sa_flags = 0;
   sigaction (SIGINT, NULL, &old_action);
-  if (old_action.sa_handler != SIG_IGN)
+  if (old_action.sa_handler != SIG_IGN) {
     sigaction (SIGINT, &new_action, NULL);
+  }
 
   if(map_peripheral(&gpio) == -1) 
   {
@@ -128,19 +150,13 @@ int main(int argc,char **argv)
     return 0;
   }
 
-  // first create the fifo listener
-  // pthread_t flasher_control_thread;
-  // int cntrl_success = pthread_create(&flasher_control_thread, NULL, flasherctl, NULL);
-  // assert(0 == cntrl_success);
-
   // then create one flasher for each pin we will use
-  unsigned char pinNumbers[NUM_PINS];
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
     if (is_active_pin(pin)) { // hack while we only have 2 LEDs, upgrade later
-      pinNumbers[pin] = pin;
-      int pin_thread_success = pthread_create(&flasher_threads[pin], NULL, flasher, (void*)&pinNumbers[pin]);
+      pins[pin].pin = pin;
+      int pin_thread_success = pthread_create(&(pins[pin].thread), NULL, flasher, (void*)&pins[pin]);
       assert(0 == pin_thread_success);
-      printf("created thread for pin %d\n",pinNumbers[pin]);
+      printf("created thread for pin %d\n",pin);
     }
   }
 
@@ -157,7 +173,7 @@ int main(int argc,char **argv)
           buf[r] = 0;
           doControlMessage(buf);
         }
-        usleep(10000); // reduce CPU load
+        usleep(dutyCycle); // reduce CPU load
       }
       if (close(flasherfd)) {
         perror("failed to close fifo");
@@ -177,13 +193,10 @@ int main(int argc,char **argv)
   
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
     if (is_active_pin(pin)) {
-      pthread_join(flasher_threads[pin],NULL);
+      pthread_join(pins[pin],NULL);
       printf("thread %d done\n",pin);
     }
   }
-
-  // pthread_join(flasher_control_thread,NULL);
-  // printf("control thread done\n");
 
   return 0; 
 }
