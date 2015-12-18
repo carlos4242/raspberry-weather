@@ -110,10 +110,18 @@ void doControlMessage(char * message) {
         unsigned char newBrightness = atoi(message);
         printf("message is %s, interpreted as brightness %d\n",message,newBrightness);
         if (steadyMsg) {
+          if (newBrightness>maxBrightness) {
+            newBrightness = maxBrightness;
+          } else (newBrightness<minBrightness) {
+            newBrightness = minBrightness;
+          }
           pins[pin].brightness = newBrightness;
           pins[pin].flashPeriod = 0;
         } else if (flashMsg) {
-          printf("flash not implemented\n");
+          if (newBrightness<=0) {
+            newBrightness = 1;
+          }
+          pins[pin].flashPeriod = 100000*newBrightness;
         }
       } else {
         printf("invalid pin %d",pin);
