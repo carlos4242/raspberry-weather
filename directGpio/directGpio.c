@@ -12,7 +12,7 @@
 #define NUM_PINS 26
 #define MIN_PIN 1 // for now, pin 0 is invalid, fix this later if needed
 #define flasherPipe "/tmp/flasher"
-#define maxBrightness 256.0
+#define maxBrightness 255.0
 #define minBrightness 0.0
 #define brightnessStep 1.0
 #define dutyCycle 10000
@@ -112,7 +112,7 @@ void doControlMessage(char * message) {
         if (steadyMsg) {
           if (newBrightness>maxBrightness) {
             newBrightness = maxBrightness;
-          } else (newBrightness<minBrightness) {
+          } else if (newBrightness<minBrightness) {
             newBrightness = minBrightness;
           }
           pins[pin].brightness = newBrightness;
