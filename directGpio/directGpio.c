@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <assert.h>
 #include <errno.h>
+#include <float.h>
 
 #define CMD_BUF 1024
 #define NUM_PINS 26
@@ -53,7 +54,7 @@ void *flasher(void *pptr)
   {
     if (!pin->flashPeriod && pin->brightness<FLT_EPSILON) {
       usleep(dutyCycle);
-      GPIO_CLR = 1 << pin;
+      GPIO_CLR = 1 << pin->pin;
     } else {
       useconds_t flashRate = pin->flashPeriod;
       useconds_t flashSteps = flashRate / dutyCycle;
@@ -71,22 +72,22 @@ void *flasher(void *pptr)
 
       useconds_t mark = pin->brightness / maxBrightness * dutyCycle;      
       if (mark) {
-        GPIO_SET = 1 << pin;
+        GPIO_SET = 1 << pin->pin;
         usleep(mark);
       }
 
       float spacePct = maxBrightness - pin->brightness;
       useconds_t space = spacePct / maxBrightness * dutyCycle;
       if (space) {
-        GPIO_CLR = 1 << pin;
+        GPIO_CLR = 1 << pin->pin;
         usleep(space);
       }
     }
   }
 
-  GPIO_CLR = 1 << pin;
+  GPIO_CLR = 1 << pin->pin;
  
-  printf("thread %d finished and pin reset\n",pin);
+  printf("thread %d finished and pin reset\n",pin->pin);
   return NULL;
 }
 
@@ -108,7 +109,12 @@ void doControlMessage(char * message) {
         message += 3;
         unsigned char newBrightness = atoi(message);
         printf("message is %s, interpreted as brightness %d\n",message,newBrightness);
-        brightness[pin] = newBrightness;
+        if (steadyMsg) {
+          pins[pin].brightness = newBrightness;
+          pins[pin].flashPeriod = 0;
+        } else if (flashMsg) {
+          printf("flash not implemented\n");
+        }
       } else {
         printf("invalid pin %d",pin);
       }
@@ -193,7 +199,7 @@ int main(int argc,char **argv)
   
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
     if (is_active_pin(pin)) {
-      pthread_join(pins[pin],NULL);
+      pthread_join(pins[pin].thread,NULL);
       printf("thread %d done\n",pin);
     }
   }
