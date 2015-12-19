@@ -204,15 +204,15 @@ int main(int argc,char **argv)
   umask(0);
   debugFile = fopen(flasherLog, "w+");
   if (!debugFile) {
-    perror("failed to create debug log file")
+    perror("failed to create debug log file");
   } 
   sid = setsid();
   if (sid < 0) {
-    daemonLog("%s failed to setsid",strerror(errno));
+    daemonLog("%s failed to setsid\n",strerror(errno));
     exit(EXIT_FAILURE);
   }
   if ((chdir(flasherPwd)) < 0) {
-    daemonLog("%s failed to chdir",strerror(errno));
+    daemonLog("%s failed to chdir\n",strerror(errno));
     exit(EXIT_FAILURE);
   }
   close(STDIN_FILENO);
