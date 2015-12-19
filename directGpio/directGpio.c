@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <float.h>
+#include <stdarg.h>
 
 #define CMD_BUF 1024
 #define NUM_PINS 26
