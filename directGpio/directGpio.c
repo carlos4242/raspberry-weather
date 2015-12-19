@@ -247,16 +247,16 @@ int main(int argc,char **argv)
         usleep(dutyCycle); // reduce CPU load
       }
       if (close(flasherfd)) {
-        daemonLog("%s failed to close fifo",strerror(errno));
+        daemonLog("%s failed to close fifo\n",strerror(errno));
       }
     } else {
-      daemonLog("%s failed to open fifo",strerror(errno));
+      daemonLog("%s failed to open fifo\n",strerror(errno));
     }
     if (unlink(flasherPipe)) {
-      daemonLog("%s failed to cleanup fifo",strerror(errno));
+      daemonLog("%s failed to cleanup fifo\n",strerror(errno));
     }
   } else {
-    daemonLog("%s failed to create fifo",strerror(errno));
+    daemonLog("%s failed to create fifo\n",strerror(errno));
   }
 
   // either we couldn't open the fifo or we opened it, ran for a bit and received a shutdown...
