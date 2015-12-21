@@ -60,13 +60,18 @@ function writeSpecialPrecipitation(snow,hail,frost,chill) {
 	} else {
 		writableStream.write('s:25:000');
 	}
-	if (frost) {
-		writableStream.write('s:21:200');
-	} else if (chill) {
-		writableStream.write('s:21:005');
-	} else {
-		writableStream.write('s:21:000');
-	}
+	writableStream.end();
+	writableStream.on('finish', function() {
+		var s2 = fs.createWriteStream('/tmp/flasher');
+		if (frost) {
+			s2.write('s:21:200');
+		} else if (chill) {
+			s2.write('s:21:005');
+		} else {
+			s2.write('s:21:000');
+		}
+		s2.end();
+	});
 }
 
 function finish() {
