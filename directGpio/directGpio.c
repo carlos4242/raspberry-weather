@@ -28,12 +28,26 @@ void sigInt(int signal) {
 
 FILE * debugFile = NULL;
 
-void daemonLog(const char* format, ...){
+void daemonLog(const char* format, ...) {
   if (debugFile) {
+    const size_t messageSize = 500;
+    char message[messageSize];
+
     va_list args;
     va_start (args, format);
-    vfprintf (debugFile, format, args);
+    vsnprintf (message, messageSize, format, args);
     va_end (args);
+
+    const size_t dtSize = 20;
+    char dt[dtSize];
+    struct tm tm;
+    time_t current_time;
+    current_time = time(NULL);
+    tm = *localtime(&current_time);
+    strftime(dt, dtSize, "%d/%m/%Y %H:%M:%S", &tm);
+
+    fprintf(debugFile,"%s %s",dt,message);
+    fflush(debugFile);
   }
 }
 
@@ -119,26 +133,27 @@ void doControlMessage(char * message) {
       char pinBuf[3] = { 0 };
       strncpy(pinBuf,message,2);
       unsigned char pin = atoi(pinBuf);
-      daemonLog("adjusting pin %s / %d\n",pinBuf,pin);
+      daemonLog("adjusting pin %d\n",pin);
       if (pin >= MIN_PIN && pin < NUM_PINS) {
         INP_GPIO(pin);
         OUT_GPIO(pin); // Define pin as output
         message += 3;
-        unsigned char newBrightness = atoi(message);
-        daemonLog("message is %s, interpreted as brightness %d\n",message,newBrightness);
+        unsigned char newParameter = atoi(message);
         if (steadyMsg) {
-          if (newBrightness>maxBrightness) {
-            newBrightness = maxBrightness;
-          } else if (newBrightness<minBrightness) {
-            newBrightness = minBrightness;
+          if (newParameter>maxBrightness) {
+            newParameter = maxBrightness;
+          } else if (newParameter<minBrightness) {
+            newParameter = minBrightness;
           }
-          pins[pin].brightness = newBrightness;
           pins[pin].flashPeriod = 0;
+          pins[pin].brightness = newParameter;
+          daemonLog("parameter is %s, interpreted as brightness %d\n",message,newParameter);
         } else if (flashMsg) {
-          if (newBrightness<=0) {
-            newBrightness = 1;
+          if (newParameter<=0) {
+            newParameter = 1;
           }
-          pins[pin].flashPeriod = 100000*newBrightness;
+          pins[pin].flashPeriod = 100000*newParameter;
+          daemonLog("parameter is %s, interpreted as flash period %d\n",message,newParameter);
         }
       } else {
         daemonLog("invalid pin %d",pin);
@@ -204,6 +219,7 @@ int main(int argc,char **argv)
   }
   umask(0);
   debugFile = fopen(flasherLog, "w+");
+  daemonLog("created log file\n");
   if (!debugFile) {
     perror("failed to create debug log file");
   } 
@@ -216,10 +232,11 @@ int main(int argc,char **argv)
     daemonLog("%s failed to chdir\n",strerror(errno));
     exit(EXIT_FAILURE);
   }
-  close(STDIN_FILENO);
+  close(STDIN_FILENO);  // this is enough to stop the daemon from working
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
   // we are now a daemon, logging to file
+  daemonLog("daemon running\n");
 
   // then create one flasher for each pin we will use
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
@@ -237,7 +254,7 @@ int main(int argc,char **argv)
   if (fifo_create_success == 0 || errno == EEXIST) {
     daemonLog("Waiting for messages on %s...\n",flasherPipe);
     int flasherfd = open(flasherPipe,O_RDONLY);
-    if (flasherfd > 0) {
+    if (flasherfd >= 0) {
       while (keepRunning) {
         int r = read(flasherfd,buf,CMD_BUF);
         if (r>0) {
