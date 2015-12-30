@@ -66,7 +66,7 @@ function writeSpecialPrecipitation(snow,hail,frost,chill) {
 		if (frost) {
 			s2.write('s:21:200');
 		} else if (chill) {
-			s2.write('s:21:005');
+			s2.write('s:21:001');
 		} else {
 			s2.write('s:21:000');
 		}
