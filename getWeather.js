@@ -51,27 +51,44 @@ function waitToFinish() {
 // snow is solid white, frost turns on the blue, chill is a dim blue, hail is flashing white
 // if [ -p /tmp/flasher ] ... if we were in a shell but we aren't
 
-function writeSpecialPrecipitation(snow,hail,frost,chill) {
+function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill) {
 	var writableStream = fs.createWriteStream('/tmp/flasher');
 	if (snow) {
-		writableStream.write('s:25:150');
+		writableStream.write('s:21:150\n');
 	} else if (hail) {
-		writableStream.write('f:25:005');
+		writableStream.write('f:21:005\n');
 	} else {
-		writableStream.write('s:25:000');
+		writableStream.write('s:21:000\n');
+	}
+
+	if (frost) {
+		writableStream.write('s:12:255\n');
+	} else if (chill) {
+		writableStream.write('s:12:003\n');
+	} else {
+		writableStream.write('s:12:000\n');
+	}
+
+	if (cloudy) {
+		writableStream.write('s:25:255\n');
+	} else {
+		writableStream.write('s:25:000\n');
+	}
+	
+	if (sunny) {
+		writableStream.write('s:18:255\n');
+	} else {
+		writableStream.write('s:18:000\n');
+	}
+
+	if (alert) {
+		writableStream.write('f:23:005\n');
+	} else if (rain) {
+		writableStream.write('s:23:255\n');
+	} else {
+		writableStream.write('s:23:000\n');
 	}
 	writableStream.end();
-	writableStream.on('finish', function() {
-		var s2 = fs.createWriteStream('/tmp/flasher');
-		if (frost) {
-			s2.write('s:21:200');
-		} else if (chill) {
-			s2.write('s:21:001');
-		} else {
-			s2.write('s:21:000');
-		}
-		s2.end();
-	});
 }
 
 function finish() {
@@ -106,7 +123,7 @@ function finish() {
 	var output = (cloudy?"1":"0") + (sunny?"1":"0") + ((rain||sleet)?"1":"0") + (alert?"1":"0") + (moon?"1":"0") + (daytime?"1":"0") + (icyPrecipitation?"1":"0");
 	fs.writeFileSync(outputFilename,output);
 
-	writeSpecialPrecipitation(snow,hail,frost,chill);
+	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill);
 
 	if (flags == 'today') {
 		console.log(JSON.stringify(today, null, 2));	

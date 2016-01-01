@@ -15,19 +15,29 @@
 #define flasherPipe "/tmp/flasher"
 #define flasherPwd "/tmp"
 #define flasherLog "/tmp/flasher.log"
+#define statsFilePath "/tmp/flasher.stats"
 #define maxBrightness 255.0
 #define minBrightness 0.0
 #define brightnessStep 1.0
 #define dutyCycle 10000
 
-bool keepRunning = true;
+// one thread for each pin to be PWMed
+typedef struct {
+  unsigned char pin;
+  pthread_t thread;
+  useconds_t flashPeriod;
+  float brightness;
+} pin_t;
+pin_t pins[NUM_PINS] = {0};
 
+// handle graceful shutdown
+bool keepRunning = true;
 void sigInt(int signal) {
   keepRunning = false;
 }
 
+// handle logging
 FILE * debugFile = NULL;
-
 void daemonLog(const char* format, ...) {
   if (debugFile) {
     const size_t messageSize = 500;
@@ -51,6 +61,23 @@ void daemonLog(const char* format, ...) {
   }
 }
 
+void dumpStatsFile() {
+  FILE * statsFile = fopen(statsFilePath, "w+");
+  if (statsFile) {
+    daemonLog("created stats file\n");
+    for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
+      if (pins[pin].thread) {
+        fprintf(statsFile,"pin %d : flash = %lu, brightness = %.0f\n",pin,pins[pin].flashPeriod,pins[pin].brightness);
+      }
+    }
+    fclose(statsFile);
+    daemonLog("finished stats file and closed\n");
+  } else {
+    perror("failed to create stats file");
+  }
+}
+
+// handle help
 void showHelp(char * basename) {
   printf("%s runs as a daemon",basename);
   printf("To control a running daemon: echo (s|f):XX:YYY > %s\n",flasherPipe);
@@ -60,22 +87,7 @@ void showHelp(char * basename) {
   printf("SIGHUP, SIGINT or SIGTERM to cleanly shut down the daemon");
 }
 
-
-// one thread for each pin to be PWMed
-
-typedef struct {
-  unsigned char pin;
-  pthread_t thread;
-  useconds_t flashPeriod;
-  float brightness;
-} pin_t;
-
-pin_t pins[NUM_PINS] = {0};
-
-// pthread_t flasher_threads[NUM_PINS];
-// useconds_t flashRates[NUM_PINS] = {0};
-// unsigned char brightness[NUM_PINS] = {0};
-
+// thread pin control routine, does timed PWM to control brightness and pulsing
 void *flasher(void *pptr)
 {
   bool waxing = true;
@@ -116,15 +128,19 @@ void *flasher(void *pptr)
     }
   }
 
+  // turn off the lamp when we have been signalled to shut down
   GPIO_CLR = 1 << pin->pin;
  
   daemonLog("thread %d finished and pin reset\n",pin->pin);
   return NULL;
 }
 
+// interpret the control message from the pipe
+// structure is s:XX:YYY, where XX is the pin number and YYY is the brightness (0-255)
+// structure is f:XX:YYY, where XX is the pin number and YYY is the flashing speed (0-255)
 void doControlMessage(char * message) {
-  bool steadyMsg = strncmp(message,"s:",2) == 0; // structure is s:XX:YYY, where XX is the pin number and YYY is the brightness (0-255)
-  bool flashMsg = strncmp(message,"f:",2) == 0; // structure is f:XX:YYY, where XX is the pin number and YYY is the flashing speed (0-255)
+  bool steadyMsg = strncmp(message,"s:",2) == 0;
+  bool flashMsg = strncmp(message,"f:",2) == 0;
   if (steadyMsg||flashMsg) { 
     daemonLog("received control message %s\n",message);
     message += 2;
@@ -155,6 +171,11 @@ void doControlMessage(char * message) {
           pins[pin].flashPeriod = 100000*newParameter;
           daemonLog("parameter is %s, interpreted as flash period %d\n",message,newParameter);
         }
+        if (!pins[pin].thread) {
+          int pin_thread_success = pthread_create(&pins[pin].thread, NULL, flasher, (void*)&pins[pin]);
+          assert(0 == pin_thread_success);
+          daemonLog("created thread for pin %d\n",pin);
+        }
       } else {
         daemonLog("invalid pin %d",pin);
       }
@@ -164,15 +185,9 @@ void doControlMessage(char * message) {
   }
 }
 
-// void *flasherctl(void *arg) {
-
-//   printf("flasher control thread finished\n");
-//   return NULL;
-// }
-
-const unsigned char activePins[] = {21,25}; // to avoid being wasteful of resource, only create threads for pins that are actually wired up, unlikely to be all 26!
-#define is_active_pin(pin) (pin == activePins[0] || pin == activePins[1]) // hack while we only have 2 LEDs, upgrade later
-
+// the main control function
+// print help, if needed, setup signal handling for clean daemon exit, setup GPIO
+// daemonize, setup fifo and wait for instructions
 int main(int argc,char **argv)
 {
   // emit help and exit cleanly if they specify any parameters
@@ -207,7 +222,8 @@ int main(int argc,char **argv)
   }
 
   // now the initial setup is done, attempt to make ourselves a daemon before continuing
-  // all logging from now on goes to a dedicated log file (from http://www.netzmafia.de/skripten/unix/linux-daemon-howto.html)
+  // all logging from now on goes to a dedicated log file
+  // (from http://www.netzmafia.de/skripten/unix/linux-daemon-howto.html)
   pid_t pid, sid;
   pid = fork();
   if (pid < 0) {
@@ -219,10 +235,11 @@ int main(int argc,char **argv)
   }
   umask(0);
   debugFile = fopen(flasherLog, "w+");
-  daemonLog("created log file\n");
   if (!debugFile) {
     perror("failed to create debug log file");
-  } 
+  } else {
+    daemonLog("created log file\n");
+  }
   sid = setsid();
   if (sid < 0) {
     daemonLog("%s failed to setsid\n",strerror(errno));
@@ -240,31 +257,29 @@ int main(int argc,char **argv)
 
   // then create one flasher for each pin we will use
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
-    if (is_active_pin(pin)) { // hack while we only have 2 LEDs, upgrade later
-      pins[pin].pin = pin;
-      int pin_thread_success = pthread_create(&(pins[pin].thread), NULL, flasher, (void*)&pins[pin]);
-      assert(0 == pin_thread_success);
-      daemonLog("created thread for pin %d\n",pin);
-    }
+    pins[pin].pin = pin;
   }
 
   // main loop, open the fifo and wait for messages or for interrupt
+  unlink(flasherPipe);
   char buf[CMD_BUF];
   int fifo_create_success = mkfifo(flasherPipe,0777);
   if (fifo_create_success == 0 || errno == EEXIST) {
     daemonLog("Waiting for messages on %s...\n",flasherPipe);
-    int flasherfd = open(flasherPipe,O_RDONLY);
-    if (flasherfd >= 0) {
+    FILE * flasherfile = fopen(flasherPipe,"r");
+    if (flasherfile) {
       while (keepRunning) {
-        int r = read(flasherfd,buf,CMD_BUF);
-        if (r>0) {
-          buf[r] = 0;
+        if (fgets(buf,CMD_BUF,flasherfile)) {
           doControlMessage(buf);
+          dumpStatsFile();
         }
         usleep(dutyCycle); // reduce CPU load
       }
-      if (close(flasherfd)) {
+      if (fclose(flasherfile)) {
         daemonLog("%s failed to close fifo\n",strerror(errno));
+      }
+      if (unlink(statsFilePath)) {
+        daemonLog("%s failed to cleanup stats\n",strerror(errno));
       }
     } else {
       daemonLog("%s failed to open fifo\n",strerror(errno));
@@ -279,8 +294,9 @@ int main(int argc,char **argv)
   // either we couldn't open the fifo or we opened it, ran for a bit and received a shutdown...
   daemonLog("preparing to shut down...\n");
   
+  // try to clean up all threads
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
-    if (is_active_pin(pin)) {
+    if (pins[pin].thread) {
       pthread_join(pins[pin].thread,NULL);
       daemonLog("thread %d done\n",pin);
     }
