@@ -100,7 +100,8 @@ function finish() {
 	var pt = today.precipType;
 	var sunrise = today.sunriseTime;
 	var sunset = today.sunsetTime;
-	var minTemp = today.apparentTemperatureMin;
+	var minTemp = today.temperatureMin;
+	var apparentMin = today.apparentTemperatureMin;
 
 	// interpretation
 	var cloudy = cloudCover > 0.5;
@@ -113,7 +114,7 @@ function finish() {
 	var icyPrecipitation = sleet|snow|hail;
 	var alert = alerts != undefined;
 	var frost = minTemp <= 0;
-	var chill = minTemp < 4;
+	var chill = apparentMin < 4;
 	var now = Math.floor(Date.now() / 1000);
 	var daytime = now > sunrise && now < sunset;
 	var moon = (sunny && daytime);
