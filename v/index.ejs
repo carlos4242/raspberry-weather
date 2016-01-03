@@ -1,0 +1,20 @@
+<% include partials/head %>
+<title>light control</title>
+<link rel="icon" href="/res/favicon.png">
+<link rel="apple-touch-icon" href="/res/iOSHomeScreenIcon.png">
+<link rel="apple-touch-startup-image" href="/res/iOSLaunchScreenIcon.png">
+
+<header>
+<div id='pageTitle'>light control</div>
+</header>
+
+<main>
+<p>Tube Lamp : <input type='checkbox' id='lamp2' disabled <%=tubeLampOn%>></p>
+<p>Round Lamp : <input type='checkbox' id='lamp1' disabled <%=roundLampOn%>></p>
+<p>Corner Lamp : <input type='checkbox' id='lamp3' disabled <%=cornerLampOn%>><p>
+</main>
+
+<footer>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+<script src="/js/lights.js"></script>
+</footer>
