@@ -1,5 +1,5 @@
 function refresh() {
-	$.get('http://10.0.1.160/lights',function(data,status) {
+	$.get('/lights',function(data,status) {
 		var json = $.parseJSON(data);
 		document.getElementById('lamp1').checked = !json[1]
 		document.getElementById('lamp2').checked = !json[2]
@@ -7,7 +7,7 @@ function refresh() {
 	});
 }
 function setLampOn(lamp,on) {
-	$.post('http://10.0.1.160/lights/'+lamp,'on='+(on?0:1));
+	$.post('/lights/'+lamp,'on='+(on?0:1));
 }
 $(document).ready(function(){
 	$('#lamp1').prop('disabled', false).change(function(){
@@ -23,10 +23,10 @@ $(document).ready(function(){
 	$('#allOnBtn').fadeIn('slow',function() {
 		$('#pageTitle').text('light control');
 	}).click(function(){
-		$.post('http://10.0.1.160/lights','allOn=1',function(){refresh()});
+		$.post('/lights','allOn=1',function(){refresh()});
 	});
 	$('#allOffBtn').fadeIn('slow').click(function(){
-		$.post('http://10.0.1.160/lights','allOff=1',function(){refresh()});
+		$.post('/lights','allOff=1',function(){refresh()});
 	});
 	refresh();
 	setInterval(refresh, 10000);
