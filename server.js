@@ -56,13 +56,15 @@ function lights(lightsByte,lightNo) {
 	}
 }
 
-app.get('/lights',function(req,res) {
+function getLightsReply(req,res) {
 	var i2c1 = i2c.openSync(1);
 	var b = new Buffer(1);
 	i2c1.i2cReadSync(0x04,1,b);
 	i2c1.closeSync();
 	res.end(JSON.stringify(lights(b[0])));
-});
+}
+
+app.get('/lights',getLightsReply);
 
 app.post('/lights',function(req,res) {
 	console.log('post to lights');
@@ -73,6 +75,10 @@ app.post('/lights',function(req,res) {
 		i2c1.i2cWriteSync(0x04,1,new Buffer("0"));
 	}
 	i2c1.closeSync();
+	setTimeout(function() {
+		// give the arduino time before the next i2c bus request
+		getLightsReply(req,res);
+	},100);
 });
 
 app.post('/lights/:light',function(req,res) {
@@ -99,6 +105,10 @@ app.post('/lights/:light',function(req,res) {
 		i2c1.i2cWriteSync(0x04,1,new Buffer(cmd));
 	}
 	i2c1.closeSync();
+	setTimeout(function() {
+		// give the arduino time before the next i2c bus request
+		getLightsReply(req,res);
+	},100);
 });
 
 app.get('/lights/:light',function(req,res) {
