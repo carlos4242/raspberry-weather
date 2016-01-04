@@ -82,15 +82,15 @@ app.post('/lights/:light',function(req,res) {
 	var cmd = null;
 	switch (req.params.light) {
 		case "1":
-			cmd = (req.body.on == 1)?"b":"a";
+			cmd = (req.body.on == 1)?"a":"b";
 			console.log("light1");
 			break;
 		case "2":
-			cmd = (req.body.on == 1)?"d":"c";
+			cmd = (req.body.on == 1)?"c":"d";
 			console.log("light2");
 			break;
 		case "3":
-			cmd = (req.body.on == 1)?"f":"e";
+			cmd = (req.body.on == 1)?"e":"f";
 			console.log("light3");
 			break;
 	}
