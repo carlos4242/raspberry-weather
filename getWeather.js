@@ -51,7 +51,7 @@ function waitToFinish() {
 // snow is solid white, frost turns on the blue, chill is a dim blue, hail is flashing white
 // if [ -p /tmp/flasher ] ... if we were in a shell but we aren't
 
-function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill) {
+function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp,pi) {
 	var writableStream = fs.createWriteStream('/tmp/flasher');
 	if (snow) {
 		writableStream.write('s:21:150\n');
@@ -76,7 +76,14 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill) {
 	}
 	
 	if (sunny) {
-		writableStream.write('s:18:255\n');
+		var ss = (0.7 - cloudCover);
+		if (ss < 0) {
+			ss = 0;
+		} else if (ss > 0.7) {
+			ss = 0.7;
+		}
+		var suni = (ss / 0.7) * 255;
+		writableStream.write('s:18:'+suni+'\n');
 	} else {
 		writableStream.write('s:18:000\n');
 	}
@@ -84,7 +91,14 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill) {
 	if (alert) {
 		writableStream.write('f:23:005\n');
 	} else if (rain) {
-		writableStream.write('s:23:255\n');
+		var ps = pi * 10;
+		if (ps < 0) {
+			ps = 0;
+		} else if (ps > 1) {
+			ps = 1;
+		}
+		var raini = ps * 255 * pp;
+		writableStream.write('s:23:'+raini+'\n');
 	} else {
 		writableStream.write('s:23:000\n');
 	}
@@ -98,6 +112,7 @@ function finish() {
 	var cloudCover = today.cloudCover;
 	var pp = today.precipProbability;
 	var pt = today.precipType;
+	var pi = today.precipIntensity;
 	var sunrise = today.sunriseTime;
 	var sunset = today.sunsetTime;
 	var minTemp = today.temperatureMin;
@@ -114,17 +129,17 @@ function finish() {
 	var icyPrecipitation = sleet|snow|hail;
 	var alert = alerts != undefined;
 	var frost = minTemp <= 0;
-	var chill = apparentMin < 4;
+	var chill = false;//apparentMin < 4;
 	var now = Math.floor(Date.now() / 1000);
 	var daytime = now > sunrise && now < sunset;
 	var moon = (sunny && daytime);
 	// output is
 	// cloud, sun, rain, alert, moon, daytime, sleet, snow, hail
 	// like 110011000
-	var output = (cloudy?"1":"0") + (sunny?"1":"0") + ((rain||sleet)?"1":"0") + (alert?"1":"0") + (moon?"1":"0") + (daytime?"1":"0") + (icyPrecipitation?"1":"0");
-	fs.writeFileSync(outputFilename,output);
+	// var output = (cloudy?"1":"0") + (sunny?"1":"0") + ((rain||sleet)?"1":"0") + (alert?"1":"0") + (moon?"1":"0") + (daytime?"1":"0") + (icyPrecipitation?"1":"0");
+	// fs.writeFileSync(outputFilename,output);
 
-	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill);
+	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
 
 	if (flags == 'today') {
 		console.log(JSON.stringify(today, null, 2));	
