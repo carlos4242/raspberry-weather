@@ -45,7 +45,6 @@ app.get('/', function(req, res) {
 app.get('/light',getLightsReply);
 
 app.post('/light',function(req,res) {
-	console.log('post to lights');
 	var br = req.body.brightness;
 	if (br<0) {
 		br = 0;
