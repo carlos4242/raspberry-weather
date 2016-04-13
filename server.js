@@ -55,7 +55,7 @@ app.post('/light',function(req,res) {
 	console.log('post to lights');
 	var i2c1 = i2c.openSync(1);
 	var br = req.body.brightness;
-	i2c1.i2cWriteSync(0x04,1,new Buffer(br));
+	i2c1.i2cWriteSync(0x04,1,new Buffer([br]));
 
 	i2c1.closeSync();
 	setTimeout(function() {
