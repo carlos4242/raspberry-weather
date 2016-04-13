@@ -68,5 +68,5 @@ function getLightsReply(req,res) {
 	i2c1.i2cReadSync(0x04,1,b);
 	i2c1.closeSync();
 	var brightness = 128 - b[0];
-	res.end(JSON.stringify(lights({"light":brightness})));
+	res.end(JSON.stringify({"light":brightness}));
 }
