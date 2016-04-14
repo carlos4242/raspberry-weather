@@ -20,15 +20,15 @@ app.use('/js',express.static(__dirname + '/js'));
 app.use('/res',express.static(__dirname + '/res'));
 
 // we communicate with the Arduino via I2C on bus one, device 4
-// dimming level (0-128)  0 = on, 128 = off
+// dimming level (0-138)  0 = on, 138 = off
 
 
 // GET /   ... get web code
 // GET /light   ... get json of light status
 // POST /light  ...  brightness=XX ... change light brightness
 
-// to make it more friendly, we will reverse the dimming level so 0 is off and 128 is maximum brightness
-// any number below 0 will be read as 0 and any number above 128 will be read as 128
+// to make it more friendly, we will reverse the dimming level so 0 is off and 138 is maximum brightness
+// any number below 0 will be read as 0 and any number above 138 will be read as 138
 
 app.get('/', function(req, res) {
 	var i2c1 = i2c.openSync(1);
