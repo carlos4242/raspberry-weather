@@ -35,7 +35,7 @@ app.get('/', function(req, res) {
 	var b = new Buffer(1);
 	i2c1.i2cReadSync(0x04,1,b);
 	i2c1.closeSync();
-	var brightness = 128 - b[0];
+	var brightness = b[0];
   var params = {
   	lampBrightness:brightness
   };
@@ -46,12 +46,6 @@ app.get('/light',getLightsReply);
 
 app.post('/light',function(req,res) {
 	var br = req.body.brightness;
-	if (br<0) {
-		br = 0;
-	} else if (br>128) {
-		br = 128;
-	}
-	br = 128 - br;
 	var i2c1 = i2c.openSync(1);
 	i2c1.i2cWriteSync(0x04,1,new Buffer([br]));
 	i2c1.closeSync();
@@ -66,6 +60,6 @@ function getLightsReply(req,res) {
 	var b = new Buffer(1);
 	i2c1.i2cReadSync(0x04,1,b);
 	i2c1.closeSync();
-	var brightness = 128 - b[0];
+	var brightness = b[0];
 	res.end(JSON.stringify({"light":brightness}));
 }
