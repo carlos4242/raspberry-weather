@@ -176,11 +176,11 @@ void doControlMessage(char * message) {
         if (steadyMsg) {
           pins[pin].flashPeriod=0;
           pins[pin].brightness=fmaxf(fminf((float)newParameter,maxBrightness),minBrightness);
-          daemonLog("parameter is %s, interpreted as brightness %d\n",message,pins[pin].brightness);
+          daemonLog("parameter is %s, interpreted as brightness %f\n",message,pins[pin].brightness);
         } else if (flashMsg) {
           if (newParameter<=0) newParameter = 1;
           pins[pin].flashPeriod=100000*newParameter;
-          daemonLog("parameter is %s, interpreted as flash period %d\n",message,pins[pin].flashPeriod);
+          daemonLog("parameter is %s, interpreted as flash period %lu\n",message,pins[pin].flashPeriod);
         } else if (relayControlMsg) {
           newParameter=(bool)newParameter;
           pins[pin].powerOn=newParameter;
