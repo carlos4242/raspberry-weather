@@ -46,14 +46,14 @@ app.get('/', function(req, res) {
 app.get('/light',getLightsReply);
 
 app.get('/weather.txt',function(req,res) {
-	fs.readFile('./weather.txt', function(error, content) {
+	fs.readFile('/home/carlpeto/node/weather.txt', function(error, content) {
 		if (error) {
-			response.writeHead(500);
-			response.end();
+			res.writeHead(500);
+			res.end();
 		}
 		else {
-			response.writeHead(200, { 'Content-Type': 'text/plain' });
-			response.end(content, 'utf-8');
+			res.writeHead(200, { 'Content-Type': 'text/plain' });
+			res.end(content, 'utf-8');
 		}
 	})
 });
