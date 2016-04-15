@@ -70,7 +70,7 @@ void dumpStatsFile() {
     daemonLog("created stats file\n");
     for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
       if (pins[pin].thread) {
-        fprintf(statsFile,"pin %d : flash = %lu, brightness = %.0f\n",pin,pins[pin].flashPeriod,pins[pin].brightness);
+        fprintf(statsFile,"pin %d : flash = %lu, brightness = %.0f, power = %d\n",pin,pins[pin].flashPeriod,pins[pin].brightness,pins[pin].powerOn);
       }
     }
     fclose(statsFile);
@@ -174,8 +174,8 @@ void doControlMessage(char * message) {
         message+=3;
         unsigned char newParameter = atoi(message);
         if (steadyMsg) {
-          pins[pin].flashPeriod = 0;
-          pins[pin].brightness = fmaxf(fminf((float)newParameter,maxBrightness),minBrightness);
+          pins[pin].flashPeriod=0;
+          pins[pin].brightness=fmaxf(fminf((float)newParameter,maxBrightness),minBrightness);
           daemonLog("parameter is %s, interpreted as brightness %d\n",message,pins[pin].brightness);
         } else if (flashMsg) {
           if (newParameter<=0) newParameter = 1;
@@ -184,6 +184,8 @@ void doControlMessage(char * message) {
         } else if (relayControlMsg) {
           newParameter=(bool)newParameter;
           pins[pin].powerOn=newParameter;
+          pins[pin].flashPeriod=0;
+          pins[pin].brightness=0;
           daemonLog("parameter is %s, interpreted as power on %d\n",message,pins[pin].powerOn);
         }
         if (!pins[pin].thread) {
