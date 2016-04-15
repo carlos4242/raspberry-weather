@@ -137,7 +137,32 @@ function finish() {
 	// cloud, sun, rain, alert, moon, daytime, sleet, snow, hail
 	// like 110011000
 	// var output = (cloudy?"1":"0") + (sunny?"1":"0") + ((rain||sleet)?"1":"0") + (alert?"1":"0") + (moon?"1":"0") + (daytime?"1":"0") + (icyPrecipitation?"1":"0");
-	// fs.writeFileSync(outputFilename,output);
+	var output = {
+		cloudy:cloudy,
+		sunny:sunny,
+		precip:precip,
+		rain:rain,
+		sleet:sleet,
+		snow:snow,
+		hail:hail,
+		icyPrecipitation:icyPrecipitation,
+		alert:alert,
+		frost:frost,
+		chill:chill,
+		now:now,
+		daytime:daytime,
+		moon:moon,
+		cloudCover:cloudCover,
+		pp:pp,
+		pt:pt,
+		pi:pi,
+		sunrise:sunrise,
+		sunset:sunset,
+		minTemp:minTemp,
+		apparentMin:apparentMin
+	}
+
+	fs.writeFileSync(outputFilename,JSON.stringify(output, null, 2));
 
 	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
 
