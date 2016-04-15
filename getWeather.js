@@ -7,7 +7,7 @@ var http = require('https');
 var fs = require('fs');
 
 var flags = process.argv[2];
-var config = require('config.json')
+var config = require('./config.json')
 var units = (config.units == undefined) ? 'auto' : config.units;
 var excludes = (flags == 'full') ? '' : '&exclude=currently,minutely,hourly,flags';
 var weatherUrl = "https://api.forecast.io/forecast/"+config.key+"/"+config.latitude+","+config.longitude+"?units="+units+excludes;
