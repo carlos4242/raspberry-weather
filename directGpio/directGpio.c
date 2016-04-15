@@ -20,8 +20,8 @@
 #define minBrightness 0.0
 #define brightnessStep 1.0
 #define dutyCycle 10000
-#define min(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1<_2?_1:_2;})
-#define max(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1>_2?_1:_2;})
+// #define min(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1<_2?_1:_2;})
+// #define max(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1>_2?_1:_2;})
 
 // one thread for each pin to be PWMed
 typedef struct {
@@ -174,18 +174,17 @@ void doControlMessage(char * message) {
         message+=3;
         unsigned char newParameter = atoi(message);
         if (steadyMsg) {
-          newParameter=max(min(newParameter,maxBrightness),minBrightness);
           pins[pin].flashPeriod = 0;
-          pins[pin].brightness = newParameter;
-          daemonLog("parameter is %s, interpreted as brightness %d\n",message,newParameter);
+          pins[pin].brightness = fmaxf(fminf((float)newParameter,maxBrightness),minBrightness);
+          daemonLog("parameter is %s, interpreted as brightness %d\n",message,pins[pin].brightness);
         } else if (flashMsg) {
           if (newParameter<=0) newParameter = 1;
-          pins[pin].flashPeriod = 100000*newParameter;
-          daemonLog("parameter is %s, interpreted as flash period %d\n",message,newParameter);
+          pins[pin].flashPeriod=100000*newParameter;
+          daemonLog("parameter is %s, interpreted as flash period %d\n",message,pins[pin].flashPeriod);
         } else if (relayControlMsg) {
           newParameter=(bool)newParameter;
           pins[pin].powerOn=newParameter;
-          daemonLog("parameter is %s, interpreted as power on %d\n",message,newParameter);
+          daemonLog("parameter is %s, interpreted as power on %d\n",message,pins[pin].powerOn);
         }
         if (!pins[pin].thread) {
           int pin_thread_success = pthread_create(&pins[pin].thread, NULL, flasher, (void*)&pins[pin]);
