@@ -21,7 +21,7 @@
 #define brightnessStep 1.0
 #define dutyCycle 10000
 #define min(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1<_2?_1:_2;})
-#define min(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1>_2?_1:_2;})
+#define max(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1>_2?_1:_2;})
 
 // one thread for each pin to be PWMed
 typedef struct {
