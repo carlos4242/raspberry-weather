@@ -20,6 +20,8 @@
 #define minBrightness 0.0
 #define brightnessStep 1.0
 #define dutyCycle 10000
+#define min(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1<_2?_1:_2;})
+#define min(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1>_2?_1:_2;})
 
 // one thread for each pin to be PWMed
 typedef struct {
@@ -27,6 +29,7 @@ typedef struct {
   pthread_t thread;
   useconds_t flashPeriod;
   float brightness;
+  bool powerOn; // only used if brightness is ~0 and flashPeriod is 0
 } pin_t;
 pin_t pins[NUM_PINS] = {0};
 
@@ -80,10 +83,10 @@ void dumpStatsFile() {
 // handle help
 void showHelp(char * basename) {
   printf("%s runs as a daemon",basename);
-  printf("To control a running daemon: echo (s|f):XX:YYY > %s\n",flasherPipe);
-  printf("s - steady LED brightness, f - flashing LED");
+  printf("To control a running daemon: echo (p|s|f):XX:YYY > %s\n",flasherPipe);
+  printf("s - steady LED brightness, f - flashing LED, p - power on/off (for relays)");
   printf("XX - pin number 0-%d\n",NUM_PINS);
-  printf("YYY - brightness (0-255) or flash period in 10ths of a second (1-999)\n");
+  printf("YYY - brightness (0-255), flash period in 10ths of a second (1-999) or 1/0 if simple power control\n");
   printf("SIGHUP, SIGINT or SIGTERM to cleanly shut down the daemon");
 }
 
@@ -97,7 +100,11 @@ void *flasher(void *pptr)
   {
     if (!pin->flashPeriod && pin->brightness<FLT_EPSILON) {
       usleep(dutyCycle);
-      GPIO_CLR = 1 << pin->pin;
+      if (pin->powerOn) {
+        GPIO_SET = 1 << pin->pin;
+      } else {
+        GPIO_CLR = 1 << pin->pin;
+      }
     } else {
       useconds_t flashRate = pin->flashPeriod;
       useconds_t flashSteps = flashRate / dutyCycle;
@@ -136,40 +143,49 @@ void *flasher(void *pptr)
 }
 
 // interpret the control message from the pipe
-// structure is s:XX:YYY, where XX is the pin number and YYY is the brightness (0-255)
-// structure is f:XX:YYY, where XX is the pin number and YYY is the flashing speed (0-255)
+
+// FOR LEDs
+// steady...
+// s:XX:Y, where XX is the pin number and Y is the brightness (0-255)
+// flashing...
+// f:XX:Y, where XX is the pin number and Y is the flashing speed (0-255)
+
+// FOR POWER CONTROL (mains relays, etc.)
+// p:XX:Y, where XX is the pin number and Y is 0 or 1 for on or off
+
+// Note: do not use LED control signals (s: or f:) to control a relay.  It will send a PWM signal that will probably not activate the relay cleanly and may damage it.
+
 void doControlMessage(char * message) {
-  bool steadyMsg = strncmp(message,"s:",2) == 0;
-  bool flashMsg = strncmp(message,"f:",2) == 0;
-  if (steadyMsg||flashMsg) { 
+  bool steadyMsg=strncmp(message,"s:",2)==0;
+  bool flashMsg=strncmp(message,"f:",2)==0;
+  bool relayControlMsg=strncmp(message,"p:",2)==0;
+  if (steadyMsg||flashMsg||relayControlMsg) { 
     daemonLog("received control message %s\n",message);
-    message += 2;
-    message[6] = 0;
-    if (strnlen(message,6)==6) {
-      char pinBuf[3] = { 0 };
+    message+=2;
+    message[6]=0;
+    if (strnlen(message,6)<=6&&strnlen(message,6)>=4) {
+      char pinBuf[3]={0};
       strncpy(pinBuf,message,2);
       unsigned char pin = atoi(pinBuf);
       daemonLog("adjusting pin %d\n",pin);
       if (pin >= MIN_PIN && pin < NUM_PINS) {
         INP_GPIO(pin);
         OUT_GPIO(pin); // Define pin as output
-        message += 3;
+        message+=3;
         unsigned char newParameter = atoi(message);
         if (steadyMsg) {
-          if (newParameter>maxBrightness) {
-            newParameter = maxBrightness;
-          } else if (newParameter<minBrightness) {
-            newParameter = minBrightness;
-          }
+          newParameter=max(min(newParameter,maxBrightness),minBrightness);
           pins[pin].flashPeriod = 0;
           pins[pin].brightness = newParameter;
           daemonLog("parameter is %s, interpreted as brightness %d\n",message,newParameter);
         } else if (flashMsg) {
-          if (newParameter<=0) {
-            newParameter = 1;
-          }
+          if (newParameter<=0) newParameter = 1;
           pins[pin].flashPeriod = 100000*newParameter;
           daemonLog("parameter is %s, interpreted as flash period %d\n",message,newParameter);
+        } else if (relayControlMsg) {
+          newParameter=(bool)newParameter;
+          pins[pin].powerOn=newParameter;
+          daemonLog("parameter is %s, interpreted as power on %d\n",message,newParameter);
         }
         if (!pins[pin].thread) {
           int pin_thread_success = pthread_create(&pins[pin].thread, NULL, flasher, (void*)&pins[pin]);
@@ -180,7 +196,7 @@ void doControlMessage(char * message) {
         daemonLog("invalid pin %d",pin);
       }
     } else {
-      daemonLog("invalid length control message - should be s:XX:YYY was %d - %s\n",strnlen(message,6),message);
+      daemonLog("invalid length control message - should be _:XX:YYY was %d - %s\n",strnlen(message,6),message);
     }
   }
 }
