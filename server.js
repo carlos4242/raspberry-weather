@@ -4,6 +4,7 @@ var app = express();
 var port = process.env.PORT || 80;
 var server = require('http').createServer(app);
 var bodyParser = require('body-parser');
+var fs = require('fs');
 
 server.listen(port, function () {
   console.log('Server listening at port %d on IP addresses...', port);
@@ -43,6 +44,19 @@ app.get('/', function(req, res) {
 });
 
 app.get('/light',getLightsReply);
+
+app.get('/weather.txt',function(req,res) {
+	fs.readFile('./weather.txt', function(error, content) {
+		if (error) {
+			response.writeHead(500);
+			response.end();
+		}
+		else {
+			response.writeHead(200, { 'Content-Type': 'text/plain' });
+			response.end(content, 'utf-8');
+		}
+	})
+});
 
 app.post('/light',function(req,res) {
 	var br = req.body.brightness;
