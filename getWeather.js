@@ -89,7 +89,7 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 	}
 
 	if (alert) {
-		writableStream.write('f:23:025\n');
+		writableStream.write('f:23:004\n');
 	} else if (rain) {
 		var ps = pi * 10;
 		if (ps < 0) {

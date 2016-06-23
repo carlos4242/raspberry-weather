@@ -6,6 +6,11 @@ var server = require('http').createServer(app);
 var bodyParser = require('body-parser');
 var fs = require('fs');
 
+// it would be nice to make these constants when the language allows
+var i2cBusNumber = 1;
+var i2cBusAddress = 0x04;
+var i2cBufferLength = 1;
+
 server.listen(port, function () {
   console.log('Server listening at port %d on IP addresses...', port);
 });
@@ -24,6 +29,7 @@ app.use('/res',express.static(__dirname + '/res'));
 // dimming level (0-138)  0 = on, 138 = off
 
 
+
 // GET /   ... get web code
 // GET /light   ... get json of light status
 // POST /light  ...  brightness=XX ... change light brightness
@@ -32,15 +38,17 @@ app.use('/res',express.static(__dirname + '/res'));
 // any number below 0 will be read as 0 and any number above 138 will be read as 138
 
 app.get('/', function(req, res) {
-	var i2c1 = i2c.openSync(1);
-	var b = new Buffer(1);
-	i2c1.i2cReadSync(0x04,1,b);
-	i2c1.closeSync();
-	var brightness = b[0];
-  var params = {
-  	lampBrightness:brightness
-  };
-  res.render('index',params);
+	getBrightness(function(err,brightness) {
+		if (err) {
+			res.writeHead(500);
+			res.end("Cannot get brightness, arduino probably not connected or powered on. "+err);
+		} else {
+			var params = {
+		  	lampBrightness:brightness
+		  };
+		  res.render('index',params);
+		}
+	});  
 });
 
 app.get('/light',getLightsReply);
@@ -69,11 +77,35 @@ app.post('/light',function(req,res) {
 	},100);
 });
 
+// callback takes two parameters, err and brightness, which is 0 if an error occurred
+function getBrightness(cb) {
+	var i2c1 = i2c.open(1,function(err) {
+		if (err) {
+			cb(err,0);
+		} else {
+			var buf = new Buffer(i2cBufferLength);
+			i2c1.i2cRead(i2cBusAddress,i2cBufferLength,buf,function(err,bytesRead,buff) {
+				if (err) {
+					cb(err,0);
+				} else {
+					var brightness = buff[0];
+					i2c1.close(function(err) {
+						// we ignore close errors
+						cb(null,brightness);
+					});
+				}
+			});
+		}
+	});
+}
+
 function getLightsReply(req,res) {
-	var i2c1 = i2c.openSync(1);
-	var b = new Buffer(1);
-	i2c1.i2cReadSync(0x04,1,b);
-	i2c1.closeSync();
-	var brightness = b[0];
-	res.end(JSON.stringify({"light":brightness}));
+	getBrightness(function(err,brightness) {
+		if (err) {
+			res.writeHead(500);
+			res.end("Cannot get brightness "+err);
+		} else {
+			res.end(JSON.stringify({"light":brightness}));
+		}
+	});
 }
