@@ -82,7 +82,7 @@ function getBrightness(cb) {
 
 			console.log("to write...");
 			// send the command request to the arduino
-			fs.write(fd,"DMR1:?",function(err, written, string) {
+			fs.write(fd,Buffer("DMR1:?"),0,6,0,function(err, written, string) {
 				if (err) {
 					console.log("error writing to usb port : "+err);
 				} else {
