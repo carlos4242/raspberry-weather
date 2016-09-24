@@ -60,9 +60,10 @@ app.get('/weather.txt',function(req,res) {
 
 // callback takes two parameters, err and brightness, which is 0 if an error occurred
 function getBrightness(cb) {
-	console.log("reading /dev/ttyACM0...");
-	fs.open('/dev/ttyACM0', 'a+', function(error, fd) {
-		if (error) {
+	console.log("opening /dev/ttyACM0...");
+	fs.open('/dev/ttyACM0', 'r+', function(err, fd) {
+		if (err) {
+			console.log("error opening usb port : "+err);
 			cb(err,0);
 		}
 		else {
