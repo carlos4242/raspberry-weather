@@ -98,17 +98,24 @@ app.get('/weather.txt',function(req,res) {
 
 // callback takes two parameters, err and brightness, which is 0 if an error occurred
 function getBrightness(cb) {
-	fs.readFile('/dev/ttyACM0', function(error, content) {
+	fs.open('/dev/ttyACM0', 'r', function(error, fd) {
 		if (error) {
 			res.writeHead(500);
 			res.end();
 		}
 		else {
-			res.writeHead(200, { 'Content-Type': 'text/plain' });
-			res.end(content, 'utf-8');
+			var buffer = Buffer()
+			fs.read(fd,buffer,0,6,null,function(err, bytesRead, buffer) {
+				fs.close(fd,null);
+				res.writeHead(200, { 'Content-Type': 'text/plain' });
+				res.end(buffer, 'utf-8');
+			});
 		}
 	});
 	fs.appendFile('/dev/ttyACM0', "DMR1:?", function(error, content) {
+		if (error) {
+			console.log("error writing to usb port : "+error);
+		}
 	});
 }
 
