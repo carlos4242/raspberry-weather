@@ -62,25 +62,28 @@ app.get('/weather.txt',function(req,res) {
 function getBrightness(cb) {
 	console.log("reading /dev/ttyACM0...");
 	fs.open('/dev/ttyACM0', 'r', function(error, fd) {
-		console.log("read /dev/ttyACM0...");
 		if (error) {
 			res.writeHead(500);
 			res.end();
 		}
 		else {
+			console.log("opened /dev/ttyACM0...");
 			var buffer = Buffer(10);
 			fs.read(fd,buffer,0,6,null,function(err, bytesRead, buffer) {
+				console.log("read 6 from /dev/ttyACM0...");
 				fs.close(fd,null);
 				res.writeHead(200, { 'Content-Type': 'text/plain' });
 				res.end(buffer, 'utf-8');
 			});
-		}
-	});
-	fs.appendFile('/dev/ttyACM0', "DMR1:?", function(error, content) {
-		if (error) {
-			console.log("error writing to usb port : "+error);
-		} else {
-			console.log("wrote /dev/ttyACM0...");
+
+			// send the command request to the arduino
+			fs.appendFile('/dev/ttyACM0', "DMR1:?", function(error, content) {
+				if (error) {
+					console.log("error writing to usb port : "+error);
+				} else {
+					console.log("wrote /dev/ttyACM0...");
+				}
+			});
 		}
 	});
 }
