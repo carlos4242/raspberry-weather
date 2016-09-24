@@ -1,4 +1,4 @@
-var i2c = require('i2c-bus');
+// var i2c = require('i2c-bus');
 var express = require('express');
 var app = express();
 var port = process.env.PORT || 80;
@@ -7,9 +7,9 @@ var bodyParser = require('body-parser');
 var fs = require('fs');
 
 // it would be nice to make these constants when the language allows
-var i2cBusNumber = 1;
-var i2cBusAddress = 0x04;
-var i2cBufferLength = 1;
+// var i2cBusNumber = 1;
+// var i2cBusAddress = 0x04;
+// var i2cBufferLength = 1;
 
 server.listen(port, function () {
   console.log('Server listening at port %d on IP addresses...', port);
@@ -66,36 +66,49 @@ app.get('/weather.txt',function(req,res) {
 	})
 });
 
-app.post('/light',function(req,res) {
-	var br = req.body.brightness;
-	var i2c1 = i2c.openSync(1);
-	i2c1.i2cWriteSync(0x04,1,new Buffer([br]));
-	i2c1.closeSync();
-	setTimeout(function() {
-		// give the arduino time before the next i2c bus request
-		getLightsReply(req,res);
-	},100);
-});
+// app.post('/light',function(req,res) {
+// 	var br = req.body.brightness;
+// 	var i2c1 = i2c.openSync(1);
+// 	i2c1.i2cWriteSync(0x04,1,new Buffer([br]));
+// 	i2c1.closeSync();
+// 	setTimeout(function() {
+// 		// give the arduino time before the next i2c bus request
+// 		getLightsReply(req,res);
+// 	},100);
+// });
+
+	// var i2c1 = i2c.open(1,function(err) {
+	// 	if (err) {
+	// 		cb(err,0);
+	// 	} else {
+	// 		var buf = new Buffer(i2cBufferLength);
+	// 		i2c1.i2cRead(i2cBusAddress,i2cBufferLength,buf,function(err,bytesRead,buff) {
+	// 			if (err) {
+	// 				cb(err,0);
+	// 			} else {
+	// 				var brightness = buff[0];
+	// 				i2c1.close(function(err) {
+	// 					// we ignore close errors
+	// 					cb(null,brightness);
+	// 				});
+	// 			}
+	// 		});
+	// 	}
+	// });
 
 // callback takes two parameters, err and brightness, which is 0 if an error occurred
 function getBrightness(cb) {
-	var i2c1 = i2c.open(1,function(err) {
-		if (err) {
-			cb(err,0);
-		} else {
-			var buf = new Buffer(i2cBufferLength);
-			i2c1.i2cRead(i2cBusAddress,i2cBufferLength,buf,function(err,bytesRead,buff) {
-				if (err) {
-					cb(err,0);
-				} else {
-					var brightness = buff[0];
-					i2c1.close(function(err) {
-						// we ignore close errors
-						cb(null,brightness);
-					});
-				}
-			});
+	fs.readFile('/dev/ttyACM0', function(error, content) {
+		if (error) {
+			res.writeHead(500);
+			res.end();
 		}
+		else {
+			res.writeHead(200, { 'Content-Type': 'text/plain' });
+			res.end(content, 'utf-8');
+		}
+	});
+	fs.appendFile('/dev/ttyACM0', "DMR1:?", function(error, content) {
 	});
 }
 
