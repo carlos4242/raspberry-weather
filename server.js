@@ -68,7 +68,7 @@ function getBrightness(cb) {
 			res.end();
 		}
 		else {
-			var buffer = Buffer()
+			var buffer = Buffer(10);
 			fs.read(fd,buffer,0,6,null,function(err, bytesRead, buffer) {
 				fs.close(fd,null);
 				res.writeHead(200, { 'Content-Type': 'text/plain' });
