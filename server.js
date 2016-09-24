@@ -1,15 +1,9 @@
-// var i2c = require('i2c-bus');
 var express = require('express');
 var app = express();
 var port = process.env.PORT || 80;
 var server = require('http').createServer(app);
 var bodyParser = require('body-parser');
 var fs = require('fs');
-
-// it would be nice to make these constants when the language allows
-// var i2cBusNumber = 1;
-// var i2cBusAddress = 0x04;
-// var i2cBufferLength = 1;
 
 server.listen(port, function () {
   console.log('Server listening at port %d on IP addresses...', port);
@@ -27,8 +21,6 @@ app.use('/res',express.static(__dirname + '/res'));
 
 // we communicate with the Arduino via I2C on bus one, device 4
 // dimming level (0-138)  0 = on, 138 = off
-
-
 
 // GET /   ... get web code
 // GET /light   ... get json of light status
@@ -66,6 +58,51 @@ app.get('/weather.txt',function(req,res) {
 	})
 });
 
+// callback takes two parameters, err and brightness, which is 0 if an error occurred
+function getBrightness(cb) {
+	console.log("reading /dev/ttyACM0...");
+	fs.open('/dev/ttyACM0', 'r', function(error, fd) {
+		console.log("read /dev/ttyACM0...");
+		if (error) {
+			res.writeHead(500);
+			res.end();
+		}
+		else {
+			var buffer = Buffer()
+			fs.read(fd,buffer,0,6,null,function(err, bytesRead, buffer) {
+				fs.close(fd,null);
+				res.writeHead(200, { 'Content-Type': 'text/plain' });
+				res.end(buffer, 'utf-8');
+			});
+		}
+	});
+	fs.appendFile('/dev/ttyACM0', "DMR1:?", function(error, content) {
+		if (error) {
+			console.log("error writing to usb port : "+error);
+		} else {
+			console.log("wrote /dev/ttyACM0...");
+		}
+	});
+}
+
+function getLightsReply(req,res) {
+	getBrightness(function(err,brightness) {
+		if (err) {
+			res.writeHead(500);
+			res.end("Cannot get brightness "+err);
+		} else {
+			res.end(JSON.stringify({"light":brightness}));
+		}
+	});
+}
+
+
+// var i2c = require('i2c-bus');
+// it would be nice to make these constants when the language allows
+// var i2cBusNumber = 1;
+// var i2cBusAddress = 0x04;
+// var i2cBufferLength = 1;
+
 // app.post('/light',function(req,res) {
 // 	var br = req.body.brightness;
 // 	var i2c1 = i2c.openSync(1);
@@ -95,37 +132,3 @@ app.get('/weather.txt',function(req,res) {
 	// 		});
 	// 	}
 	// });
-
-// callback takes two parameters, err and brightness, which is 0 if an error occurred
-function getBrightness(cb) {
-	fs.open('/dev/ttyACM0', 'r', function(error, fd) {
-		if (error) {
-			res.writeHead(500);
-			res.end();
-		}
-		else {
-			var buffer = Buffer()
-			fs.read(fd,buffer,0,6,null,function(err, bytesRead, buffer) {
-				fs.close(fd,null);
-				res.writeHead(200, { 'Content-Type': 'text/plain' });
-				res.end(buffer, 'utf-8');
-			});
-		}
-	});
-	fs.appendFile('/dev/ttyACM0', "DMR1:?", function(error, content) {
-		if (error) {
-			console.log("error writing to usb port : "+error);
-		}
-	});
-}
-
-function getLightsReply(req,res) {
-	getBrightness(function(err,brightness) {
-		if (err) {
-			res.writeHead(500);
-			res.end("Cannot get brightness "+err);
-		} else {
-			res.end(JSON.stringify({"light":brightness}));
-		}
-	});
-}
