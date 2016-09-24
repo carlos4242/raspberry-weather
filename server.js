@@ -66,20 +66,6 @@ function getBrightness(cb) {
 			cb(err,0);
 		}
 		else {
-			console.log("opened /dev/ttyACM0...");
-			var buffer = Buffer(10);
-			fs.read(fd,buffer,0,6,null,function(err, bytesRead, buffer) {
-				console.log("rd");
-				if (err) {
-					cb(err,0);
-				} else {
-					console.log("read 6 from /dev/ttyACM0...");
-					console.log(buffer); // should interpret as brightness
-					cb(null,10);		
-				}
-				fs.close(fd,null);
-			});
-
 			console.log("to write...");
 			// send the command request to the arduino
 			fs.write(fd,Buffer("DMR1:?"),0,6,0,function(err, written, string) {
@@ -89,6 +75,22 @@ function getBrightness(cb) {
 					console.log("wrote /dev/ttyACM0...");
 				}
 			});
+
+			console.log("opened /dev/ttyACM0...");
+			var buffer = Buffer(10);
+			fs.read(fd,buffer,0,6,null,function(err, bytesRead, buffer) {
+				console.log("rd");
+				if (err) {
+					console.log("error reading from usb port : "+err);
+					cb(err,0);
+				} else {
+					console.log("read 6 from /dev/ttyACM0...");
+					console.log(buffer); // should interpret as brightness
+					cb(null,10);		
+				}
+				fs.close(fd,null);
+			});
+
 
 			// fs.appendFile('/dev/ttyACM0', "DMR1:?", function(error, content) {
 			// 	if (error) {
