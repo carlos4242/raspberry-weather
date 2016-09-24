@@ -98,7 +98,9 @@ app.get('/weather.txt',function(req,res) {
 
 // callback takes two parameters, err and brightness, which is 0 if an error occurred
 function getBrightness(cb) {
+console.log("reading /dev/ttyACM0...");
 	fs.readFile('/dev/ttyACM0', function(error, content) {
+console.log("read /dev/ttyACM0...");
 		if (error) {
 			res.writeHead(500);
 			res.end();
@@ -109,6 +111,7 @@ function getBrightness(cb) {
 		}
 	});
 	fs.appendFile('/dev/ttyACM0', "DMR1:?", function(error, content) {
+console.log("wrote /dev/ttyACM0...");
 	});
 }
 
