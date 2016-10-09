@@ -6,6 +6,7 @@ var bodyParser = require('body-parser');
 var fs = require('fs');
 var readStream = fs.createReadStream('/dev/ttyACM0');
 var currentBrightness = 'unknown';
+var savedBrightness = 0;
 
 readStream
 	.on('error', function(err) {
@@ -22,6 +23,7 @@ readStream
 				console.log("brightness read as : "+dimmerValue);
 				currentBrightness = dimmerValue;
 			}
+			savedBrightness = currentBrightness;
 		}
 	})
 	.on('open', function (fdread) {
@@ -53,10 +55,12 @@ function queryBrightness() {
 
 function powerOff() {
 	sendCommand("DMR1:_");
+	currentBrightness = 'off';
 }
 
 function powerOn() {
 	sendCommand("DMR1:O");
+	currentBrightness = savedBrightness;
 }
 
 function powerLevel(level) {
@@ -66,6 +70,8 @@ function powerLevel(level) {
 	} else if (level>120) {
 		level = 120;
 	}
+	currentBrightness = level;
+	savedBrightness = level;
 	sendCommand("DMR1:"+level);
 }
 
@@ -105,19 +111,21 @@ app.get('/', function(req, res) {
 app.get('/light', function(req,res) {
 	if (req.query.power == 'on') {
 		powerOn();
+		queryBrightness();
 		res.end();
 	} else if (req.query.power == 'off') {
 		powerOff();
+		queryBrightness();
 		res.end();
 	} else if (req.query.powerLevel != undefined) {
-		res.end();
 		powerLevel(req.query.powerLevel);
-	} else {
+		res.end();
+	} else if (req.query.check == 1) {
 		queryBrightness();
-		setTimeout(function(){
-			res.writeHead(200, { 'Content-Type': 'application/json' });
-			res.end(JSON.stringify({"light":currentBrightness}));
-		},1500);
+		res.end();
+	} else {
+		res.writeHead(200, { 'Content-Type': 'application/json' });
+		res.end(JSON.stringify({"light":currentBrightness}));
 	}
 });
 
