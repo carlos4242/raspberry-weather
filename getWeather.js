@@ -105,6 +105,45 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 	writableStream.end();
 }
 
+function printDisplayMessage(messageText) {
+	var scriptFile = __dirname + "/writeDisplay.py";
+	console.log("about to run "+scriptFile);
+	var exec = require('child_process').exec;
+	var options = {"cwd":__dirname,"env":{"DISPLAY_TEXT":messageText}};
+	exec(scriptFile, options, function(error, stdout, stderr) {
+	  if (error) {
+	    console.error('exec error: '+error);
+	    return;
+	  }
+	  console.log('stdout: '+stdout);
+	  console.log('stderr: '+stderr);
+	});
+
+	// const execFile = require('child_process').execFile;
+	// const scriptFile = __dirname + "/writeDisplay.py";
+	// const child = execFile('/usr/bin/python',[scriptFile],{"cwd":__dirname,"env":{"DISPLAY_TEXT":messageText}});
+}
+
+function timeFromUnixTime(unix_timestamp) {
+	var date = new Date(unix_timestamp*1000);
+	// Hours part from the timestamp
+	var hours = date.getHours();
+	// Minutes part from the timestamp
+	var minutes = "0" + date.getMinutes();
+	// Seconds part from the timestamp
+	var seconds = "0" + date.getSeconds();
+
+	// Will display time in 10:30:23 format
+	var formattedTime = hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
+	return formattedTime;
+}
+
+function describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime) {
+	var description = "min: "+minTemp+"C ("+apparentMin+") at "+timeFromUnixTime(minTempTime)+"    max: "+maxTemp+"C ("+apparentMax+") at "+timeFromUnixTime(maxTempTime);
+	console.log("temp description : "+description);
+	printDisplayMessage(description);
+}
+
 function finish() {
 	var weather = JSON.parse(data);
 	var alerts = weather.alerts;
@@ -117,6 +156,10 @@ function finish() {
 	var sunset = today.sunsetTime;
 	var minTemp = today.temperatureMin;
 	var apparentMin = today.apparentTemperatureMin;
+	var minTempTime = today.temperatureMinTime;
+	var maxTemp = today.temperatureMax;
+	var apparentMax = today.apparentTemperatureMax;
+	var maxTempTime = today.temperatureMaxTime;
 
 	// interpretation
 	var cloudy = cloudCover > 0.5;
@@ -165,6 +208,8 @@ function finish() {
 	fs.writeFileSync(outputFilename,JSON.stringify(output, null, 2));
 
 	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
+
+	//describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime);
 
 	if (flags == 'today') {
 		console.log(JSON.stringify(today, null, 2));	
