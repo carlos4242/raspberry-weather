@@ -105,11 +105,10 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 	writableStream.end();
 }
 
-function printDisplayMessage(messageText) {
+function printDisplayMessage(messageText,environmentVar) {
 	var scriptFile = __dirname + "/writeDisplay.py";
-	console.log("about to run "+scriptFile);
 	var exec = require('child_process').exec;
-	var options = {"cwd":__dirname,"env":{"DISPLAY_TEXT":messageText}};
+	var options = {"cwd":__dirname,"env":{environmentVar:messageText}};
 	exec(scriptFile, options, function(error, stdout, stderr) {
 	  if (error) {
 	    console.error('exec error: '+error);
@@ -118,10 +117,6 @@ function printDisplayMessage(messageText) {
 	  console.log('stdout: '+stdout);
 	  console.log('stderr: '+stderr);
 	});
-
-	// const execFile = require('child_process').execFile;
-	// const scriptFile = __dirname + "/writeDisplay.py";
-	// const child = execFile('/usr/bin/python',[scriptFile],{"cwd":__dirname,"env":{"DISPLAY_TEXT":messageText}});
 }
 
 function timeFromUnixTime(unix_timestamp) {
@@ -139,9 +134,12 @@ function timeFromUnixTime(unix_timestamp) {
 }
 
 function describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime) {
-	var description = "min: "+minTemp+"C ("+apparentMin+") at "+timeFromUnixTime(minTempTime)+"    max: "+maxTemp+"C ("+apparentMax+") at "+timeFromUnixTime(maxTempTime);
-	console.log("temp description : "+description);
-	printDisplayMessage(description);
+	var mindescription = "min: "+minTemp+"C ("+apparentMin+") at "+timeFromUnixTime(minTempTime);
+	var maxdescription = "max: "+maxTemp+"C ("+apparentMax+") at "+timeFromUnixTime(maxTempTime);
+	console.log("low temp description : "+mindescription);
+	console.log("high temp description : "+maxdescription);
+	printDisplayMessage(mindescription,"LOW_TEMP");
+	printDisplayMessage(mindescription,"HIGH_TEMP");
 }
 
 function finish() {
