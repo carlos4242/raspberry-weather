@@ -23,7 +23,7 @@ disp.display()
 
 # Create image buffer, Make sure to create image with mode '1' for 1-bit color.
 image = Image.new('1', (width, height))
-font = ImageFont.truetype('pixelmix.ttf', 12)
+font = ImageFont.truetype('pixelmix.ttf', 8)
 # font = ImageFont.load_default()
 
 draw = ImageDraw.Draw(image)
@@ -57,3 +57,5 @@ for i, c in enumerate(highTempText):
     char_width, char_height = draw.textsize(c, font=font)
     x += char_width
 
+    disp.image(image)
+    disp.display()

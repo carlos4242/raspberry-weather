@@ -105,11 +105,17 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 	writableStream.end();
 }
 
-function printDisplayMessage(messageText,environmentVar) {
+var util = require('util')
+
+function printDisplayMessage(env) {
 	var scriptFile = __dirname + "/writeDisplay.py";
 	var exec = require('child_process').exec;
-	var options = {"cwd":__dirname,"env":{environmentVar:messageText}};
+	var options = {};
+	options["cwd"] = __dirname;
+	options["env"] = env;
 	exec(scriptFile, options, function(error, stdout, stderr) {
+		// console.log(util.inspect(options, {showHidden: false, depth: null}))
+
 	  if (error) {
 	    console.error('exec error: '+error);
 	    return;
@@ -126,20 +132,23 @@ function timeFromUnixTime(unix_timestamp) {
 	// Minutes part from the timestamp
 	var minutes = "0" + date.getMinutes();
 	// Seconds part from the timestamp
-	var seconds = "0" + date.getSeconds();
+	// var seconds = "0" + date.getSeconds();
 
-	// Will display time in 10:30:23 format
-	var formattedTime = hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
+	// Will display time in 10:30 format
+	var formattedTime = hours + ':' + minutes.substr(-2);
+	// + ':' + seconds.substr(-2);
 	return formattedTime;
 }
 
 function describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime) {
-	var mindescription = "min: "+minTemp+"C ("+apparentMin+") at "+timeFromUnixTime(minTempTime);
-	var maxdescription = "max: "+maxTemp+"C ("+apparentMax+") at "+timeFromUnixTime(maxTempTime);
-	console.log("low temp description : "+mindescription);
-	console.log("high temp description : "+maxdescription);
-	printDisplayMessage(mindescription,"LOW_TEMP");
-	printDisplayMessage(mindescription,"HIGH_TEMP");
+	var mindescription = "min: "+Math.round(minTemp)+"C at "+timeFromUnixTime(minTempTime);
+	var maxdescription = "max: "+Math.round(maxTemp)+"C at "+timeFromUnixTime(maxTempTime);
+	// console.log("low temp description : "+mindescription);
+	// console.log("high temp description : "+maxdescription);
+	var env = {};
+	env["LOW_TEMP"] = mindescription;
+	env["HIGH_TEMP"] = maxdescription;
+	printDisplayMessage(env);
 }
 
 function finish() {
@@ -207,7 +216,7 @@ function finish() {
 
 	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
 
-	//describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime);
+	describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime);
 
 	if (flags == 'today') {
 		console.log(JSON.stringify(today, null, 2));	
