@@ -4,6 +4,7 @@
 import math
 import time
 import os
+import json
 
 import Adafruit_GPIO.SPI as SPI
 import Adafruit_SSD1306
@@ -23,8 +24,8 @@ disp.display()
 
 # Create image buffer, Make sure to create image with mode '1' for 1-bit color.
 image = Image.new('1', (width, height))
-font = ImageFont.truetype('pixelmix.ttf', 8)
-# font = ImageFont.load_default()
+#font = ImageFont.truetype('pixelmix.ttf', 8)
+font = ImageFont.load_default()
 
 draw = ImageDraw.Draw(image)
 
@@ -33,6 +34,11 @@ print('low temp text : '+lowTempText)
 
 highTempText = os.getenv('HIGH_TEMP',"high")
 print('high temp text : '+highTempText)
+
+daylightHoursJson = os.getenv('DAYLIGHT_HOURS',"[]")
+daylightHours = json.loads(daylightHoursJson)
+
+# drawing
 
 highTempTextWidth, unused = draw.textsize(highTempText, font=font)
 
@@ -57,5 +63,5 @@ for i, c in enumerate(highTempText):
     char_width, char_height = draw.textsize(c, font=font)
     x += char_width
 
-    disp.image(image)
-    disp.display()
+disp.image(image)
+disp.display()

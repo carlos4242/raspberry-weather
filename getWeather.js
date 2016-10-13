@@ -9,7 +9,7 @@ var fs = require('fs');
 var flags = process.argv[2];
 var config = require('./config.json')
 var units = (config.units == undefined) ? 'auto' : config.units;
-var excludes = (flags == 'full') ? '' : '&exclude=currently,minutely,hourly,flags';
+var excludes = (flags == 'full') ? '' : '&exclude=minutely,flags';
 var weatherUrl = "https://api.forecast.io/forecast/"+config.key+"/"+config.latitude+","+config.longitude+"?units="+units+excludes;
 var finished = false;
 var data = "";
@@ -114,33 +114,22 @@ function printDisplayMessage(env) {
 	options["cwd"] = __dirname;
 	options["env"] = env;
 	exec(scriptFile, options, function(error, stdout, stderr) {
-		// console.log(util.inspect(options, {showHidden: false, depth: null}))
-
 	  if (error) {
 	    console.error('exec error: '+error);
 	    return;
 	  }
-	  console.log('stdout: '+stdout);
-	  console.log('stderr: '+stderr);
 	});
 }
 
 function timeFromUnixTime(unix_timestamp) {
 	var date = new Date(unix_timestamp*1000);
-	// Hours part from the timestamp
 	var hours = date.getHours();
-	// Minutes part from the timestamp
 	var minutes = "0" + date.getMinutes();
-	// Seconds part from the timestamp
-	// var seconds = "0" + date.getSeconds();
-
-	// Will display time in 10:30 format
 	var formattedTime = hours + ':' + minutes.substr(-2);
-	// + ':' + seconds.substr(-2);
 	return formattedTime;
 }
 
-function describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime) {
+function describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime,daylightHours) {
 	var mindescription = "min: "+Math.round(minTemp)+"C at "+timeFromUnixTime(minTempTime);
 	var maxdescription = "max: "+Math.round(maxTemp)+"C at "+timeFromUnixTime(maxTempTime);
 	// console.log("low temp description : "+mindescription);
@@ -148,25 +137,57 @@ function describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax
 	var env = {};
 	env["LOW_TEMP"] = mindescription;
 	env["HIGH_TEMP"] = maxdescription;
+	env["DAYLIGHT_HOURS"] = daylightHours;
 	printDisplayMessage(env);
+}
+
+function createTempHours(hours,sunrise,sunset) {
+	// console.log(sunrise);
+	// console.log(sunset);
+	var daylightHours = new Array();
+	hours.forEach(function (hour) {
+		var time = hour.time;
+		var temp = hour.temperature;
+		// console.log("hour "+time);
+		// console.log("temp "+temp);
+		if ((time>sunrise) && (time<sunset)) {
+			var daylightHour = {time:time,temp:temp};
+			daylightHours.push(daylightHour);
+		}
+	});
+	var daylight = JSON.stringify(daylightHours);
+	// console.log(daylight);
+	// console.log(util.inspect(daylightHours, false, null));
+	return daylight;
 }
 
 function finish() {
 	var weather = JSON.parse(data);
 	var alerts = weather.alerts;
 	var today = weather.daily.data[0];
+	var tomorrow = weather.daily.data[1];
 	var cloudCover = today.cloudCover;
 	var pp = today.precipProbability;
 	var pt = today.precipType;
 	var pi = today.precipIntensity;
 	var sunrise = today.sunriseTime;
 	var sunset = today.sunsetTime;
+	var currentTime = weather.currently.time;
+	if (currentTime>sunset) {
+		sunrise = tomorrow.sunriseTime;
+		sunset = tomorrow.sunsetTime;
+	}
+
 	var minTemp = today.temperatureMin;
 	var apparentMin = today.apparentTemperatureMin;
 	var minTempTime = today.temperatureMinTime;
 	var maxTemp = today.temperatureMax;
 	var apparentMax = today.apparentTemperatureMax;
 	var maxTempTime = today.temperatureMaxTime;
+
+	var hours = weather.hourly.data;
+	// console.log(util.inspect(weather, false, null));
+	// console.log(util.inspect(hours, false, null));
 
 	// interpretation
 	var cloudy = cloudCover > 0.5;
@@ -212,12 +233,14 @@ function finish() {
 		apparentMin:apparentMin
 	}
 
+	var daylightHours = createTempHours(hours,sunrise,sunset);
+
 	fs.writeFileSync(outputFilename,JSON.stringify(output, null, 2));
 
 	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
 
-	describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime);
-
+	describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime,daylightHours);
+	
 	if (flags == 'today') {
 		console.log(JSON.stringify(today, null, 2));	
 	} else if (flags == 'daily' || flags == 'full') {
