@@ -10,7 +10,8 @@ var flags = process.argv[2];
 var config = require('./config.json')
 var units = (config.units == undefined) ? 'auto' : config.units;
 var excludes = (flags == 'full') ? '' : '&exclude=minutely,flags';
-var weatherUrl = "https://api.forecast.io/forecast/"+config.key+"/"+config.latitude+","+config.longitude+"?units="+units+excludes;
+var weatherUrl = "https://api.forecast.io/forecast/"+
+config.key+"/"+config.latitude+","+config.longitude+"?units="+units+excludes;
 var finished = false;
 var data = "";
 var waitedCount = 0;
@@ -207,7 +208,8 @@ function finish() {
 	// output is
 	// cloud, sun, rain, alert, moon, daytime, sleet, snow, hail
 	// like 110011000
-	// var output = (cloudy?"1":"0") + (sunny?"1":"0") + ((rain||sleet)?"1":"0") + (alert?"1":"0") + (moon?"1":"0") + (daytime?"1":"0") + (icyPrecipitation?"1":"0");
+	// var output = (cloudy?"1":"0") + (sunny?"1":"0") + ((rain||sleet)?"1":"0") + (alert?"1":"0") +
+	// (moon?"1":"0") + (daytime?"1":"0") + (icyPrecipitation?"1":"0");
 	var output = {
 		cloudy:cloudy,
 		sunny:sunny,

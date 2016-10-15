@@ -48,9 +48,10 @@ for i, c in enumerate(lowTempText):
     # Stop drawing if off the right side of screen.
     if x > width:
         break
-    draw.text((x, 10), c, font=font, fill=255)
+    draw.text((x, 1), c, font=font, fill=255)
     # Increment x position based on chacacter width.
     char_width, char_height = draw.textsize(c, font=font)
+    print(char_width)
     x += char_width
 
 x=10
@@ -58,7 +59,7 @@ for i, c in enumerate(highTempText):
     # Stop drawing if off the right side of screen.
     if x > width:
         break
-    draw.text((x, 30), c, font=font, fill=255)
+    draw.text((x, 55), c, font=font, fill=255)
     # Increment x position based on chacacter width.
     char_width, char_height = draw.textsize(c, font=font)
     x += char_width
