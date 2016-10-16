@@ -29,40 +29,78 @@ font = ImageFont.load_default()
 
 draw = ImageDraw.Draw(image)
 
-lowTempText = os.getenv('LOW_TEMP',"low")
-print('low temp text : '+lowTempText)
 
-highTempText = os.getenv('HIGH_TEMP',"high")
-print('high temp text : '+highTempText)
+infoJsonF = open('disp.json',"r")
+info = json.load(infoJsonF)
+infoJsonF.close()
 
-daylightHoursJson = os.getenv('DAYLIGHT_HOURS',"[]")
-daylightHours = json.loads(daylightHoursJson)
+tempsJsonF = open('temp.json',"r")
+temps = json.load(tempsJsonF)
+tempsJsonF.close()
 
-# drawing
+print(temps)
 
-highTempTextWidth, unused = draw.textsize(highTempText, font=font)
+
+# lowTempText = os.getenv('LOW_TEMP',"low")
+# highTempText = os.getenv('HIGH_TEMP',"high")
+# sunriseText = os.getenv('SUNRISE',"sunrise")
+# sunsetText = os.getenv('SUNSET',"sunrise")
+# ppText = os.getenv('PP',"pp")
+# pText = os.getenv('P',"p")
+
+lowTempText = info['LOW_TEMP']
+highTempText = info['HIGH_TEMP']
+sunriseText = info['SUNRISE']
+sunsetText = info['SUNSET']
+ppText = info['PP']
+pText = info['P']
+
+# daylightHoursJson = os.getenv('DAYLIGHT_HOURS',"[]")
+# daylightHours = json.loads(daylightHoursJson)
 
 draw.rectangle((0,0,width,height), outline=0, fill=0)
-x=10
-for i, c in enumerate(lowTempText):
-    # Stop drawing if off the right side of screen.
-    if x > width:
-        break
-    draw.text((x, 1), c, font=font, fill=255)
-    # Increment x position based on chacacter width.
-    char_width, char_height = draw.textsize(c, font=font)
-    print(char_width)
-    x += char_width
 
-x=10
-for i, c in enumerate(highTempText):
-    # Stop drawing if off the right side of screen.
-    if x > width:
-        break
-    draw.text((x, 55), c, font=font, fill=255)
-    # Increment x position based on chacacter width.
-    char_width, char_height = draw.textsize(c, font=font)
-    x += char_width
+padding = 2
+top = padding
+bottom = height-padding
+left = padding
+right = width-padding
+
+draw.line((left, bottom, right, top), fill=255)
+draw.line((left, top, right, bottom), fill=64)
+
+
+# def printTextString(x,y,text):
+#     for i, c in enumerate(text):
+#         # Stop drawing if off the right side of screen.
+#         if x > width:
+#             break
+#         draw.text((x, y), c, font=font, fill=255)
+#         # Increment x position based on chacacter width.
+#         char_width, char_height = draw.textsize(c, font=font)
+#         x += char_width
+
+# printTextString(0,1,lowTempText)
+# printTextString(0,10,sunriseText)
+# sunsetTextWidth, unused = draw.textsize(sunsetText, font=font)
+# printTextString(0,40,sunsetText)
+
+# pTextWidth, pTextHeight = draw.textsize(pText, font=font)
+# printTextString(128-pTextWidth,20,pText)
+# ppTextWidth, ppTextHeight = draw.textsize(ppText, font=font)
+# printTextString(128-ppTextWidth,21+pTextHeight,ppText)
+
+# printTextString(0,55,highTempText)
+
+# x=10
+# for i, c in enumerate(highTempText):
+#     # Stop drawing if off the right side of screen.
+#     if x > width:
+#         break
+#     draw.text((x, 55), c, font=font, fill=255)
+#     # Increment x position based on chacacter width.
+#     char_width, char_height = draw.textsize(c, font=font)
+#     x += char_width
 
 disp.image(image)
 disp.display()

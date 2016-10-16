@@ -5,6 +5,7 @@
 
 var http = require('https');
 var fs = require('fs');
+var util = require('util');
 
 var flags = process.argv[2];
 var config = require('./config.json')
@@ -19,6 +20,8 @@ var whitePin = 21;
 var bluePin = 25;
 
 const outputFilename = "weather.txt";
+const secondsInAnHour = 3600;
+const secondsInADay = secondsInAnHour*24;
 
 var clientRequest = http.get(weatherUrl).on('error', function(e) {
 	console.log("Got error: " + e.message);
@@ -106,7 +109,6 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 	writableStream.end();
 }
 
-var util = require('util')
 
 function printDisplayMessage(env) {
 	var scriptFile = __dirname + "/writeDisplay.py";
@@ -130,37 +132,110 @@ function timeFromUnixTime(unix_timestamp) {
 	return formattedTime;
 }
 
-function describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime,daylightHours) {
+function describeTemperature(
+	minTemp,minTempTime,
+	maxTemp,maxTempTime,
+	sunrise,sunset,
+	pp,pi,pt,daylightHours) {
 	var mindescription = "min: "+Math.round(minTemp)+"C at "+timeFromUnixTime(minTempTime);
 	var maxdescription = "max: "+Math.round(maxTemp)+"C at "+timeFromUnixTime(maxTempTime);
-	// console.log("low temp description : "+mindescription);
-	// console.log("high temp description : "+maxdescription);
 	var env = {};
 	env["LOW_TEMP"] = mindescription;
 	env["HIGH_TEMP"] = maxdescription;
-	env["DAYLIGHT_HOURS"] = daylightHours;
-	printDisplayMessage(env);
+	env["SUNRISE"] = "sunrise: "+timeFromUnixTime(sunrise);
+	env["SUNSET"] = "sunset: "+timeFromUnixTime(sunset);
+	env["PP"] = (pp*100)+"%";
+	env["P"] = pt+" "+pi;
+	// env["DAYLIGHT_HOURS"] = JSON.stringify(daylightHours);
+	fs.writeFile('disp.json',JSON.stringify(env),function(err){
+		if (err) {
+			console.log('could not write disp.json');
+		} else {
+			fs.writeFile('temp.json',JSON.stringify(daylightHours),function(err){
+				if (err) {
+					console.log('coult not write temp.json');
+				} else {
+					printDisplayMessage({});
+				}
+			});
+		}
+	});
 }
 
 function createTempHours(hours,sunrise,sunset) {
-	// console.log(sunrise);
-	// console.log(sunset);
-	var daylightHours = new Array();
+	var daylightHours = {};
 	hours.forEach(function (hour) {
-		var time = hour.time;
+		var time = parseInt(hour.time);
 		var temp = hour.temperature;
-		// console.log("hour "+time);
-		// console.log("temp "+temp);
 		if ((time>sunrise) && (time<sunset)) {
-			var daylightHour = {time:time,temp:temp};
-			daylightHours.push(daylightHour);
+			daylightHours[time] = temp;
+			// daylightHours.push(daylightHour);
 		}
 	});
-	var daylight = JSON.stringify(daylightHours);
-	// console.log(daylight);
-	// console.log(util.inspect(daylightHours, false, null));
-	return daylight;
+	return daylightHours;
 }
+
+// function getBlankTempsArrayForDay(dayStart) {
+// 	var days = {}
+// 	for (i = 0; i < 24; i++) {
+// 		const hour = (i*secondsInAnHour) + dayStart;
+// 		console.log(i);
+// 		console.log(secondsInAnHour);
+// 		console.log(dayStart);
+// 		console.log(hour);
+// 		days[hour] = 0;
+// 	}
+// 	return days;
+// }
+
+// function updateDaylightHoursFile(daylightHours,completion) {
+// 	var daylightKeys = Object.keys(daylightHours);
+// 	if (daylightKeys.length == 0) return; // ignore if no hours to put in
+// 	var todayKey = daylightKeys[0];
+// 	var todayStart = Math.floor(todayKey/secondsInADay)*secondsInADay;
+// 	console.log("today start : "+todayStart);
+// 	var temps;
+// 	fs.readFile('temp.json', 'utf8', function (err, tempData) {
+//   	if (err) {
+//   		console.log('error reading temp.json : '+err);
+//   		completion();
+//   	} else {
+// 		  try {
+// 		    temps = JSON.parse(tempData)
+// 		  } catch (e) {
+// 		    temps = false
+// 		  }
+// 	  	if (temps) {
+// 	  		// existing temperatures make sense, check if it needs updating to today
+// 	  		var tempsKeys = Object.keys(temps);
+// 	  		if (temps[tempsKeys] == todayStart) {
+// 	  			// existing data is valid, just replace the new bits
+// 	  			console.log('replacing new bits');
+// 	  		} else {
+// 	  			// existing data is invalid, probably it's a new day, replace it
+// 	  			temps = getBlankTempsArrayForDay(todayStart);
+// 	  			console.log('started new day, making blank array')
+// 	  		}
+// 	  	} else {
+// 	  		temps = getBlankTempsArrayForDay(todayStart);
+// 	  		console.log('couldnt parse temps, making blank array')
+// 		  	console.log('blank temps:');
+// 		  	console.log(util.inspect(temps, false, null));
+// 	  	}
+// 			Object.keys(daylightHours).forEach(function(key, index) {
+// 			  temps[key] = this[key];
+// 			}, daylightHours);
+// 			console.log("updated temps");
+// 	  	console.log(util.inspect(temps, false, null));
+// 			fs.writeFile('temp.json', JSON.stringify(temps), function (err) {
+// 			  if (err) {
+// 				  console.log("failed to write temp.json : "+err);
+// 			  }
+// 			  completion();
+// 			});
+//   	}
+// 	});
+// }
 
 function finish() {
 	var weather = JSON.parse(data);
@@ -210,6 +285,24 @@ function finish() {
 	// like 110011000
 	// var output = (cloudy?"1":"0") + (sunny?"1":"0") + ((rain||sleet)?"1":"0") + (alert?"1":"0") +
 	// (moon?"1":"0") + (daytime?"1":"0") + (icyPrecipitation?"1":"0");
+
+
+	var daylightHours = createTempHours(hours,sunrise,sunset);
+
+	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
+
+	describeTemperature(
+		minTemp,minTempTime,
+		maxTemp,maxTempTime,
+		sunrise,sunset,
+		pp,pi,pt,daylightHours);
+
+	// updateDaylightHoursFile(daylightHours,function() {
+	// 	console.log('DLH DONE');
+	// });
+
+
+
 	var output = {
 		cloudy:cloudy,
 		sunny:sunny,
@@ -234,20 +327,26 @@ function finish() {
 		minTemp:minTemp,
 		apparentMin:apparentMin
 	}
-
-	var daylightHours = createTempHours(hours,sunrise,sunset);
-
-	fs.writeFileSync(outputFilename,JSON.stringify(output, null, 2));
-
-	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
-
-	describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime,daylightHours);
+	fs.writeFile(outputFilename,JSON.stringify(output, null, 2));
 	
 	if (flags == 'today') {
 		console.log(JSON.stringify(today, null, 2));	
 	} else if (flags == 'daily' || flags == 'full') {
-		console.log(JSON.stringify(weather, null, 2));	
+		console.log(JSON.stringify(weather, null, 2));
+	} else if (flags != 'test') {
+		fs.writeFile('weather.json',data);
 	}
 }
 
-waitToFinish();
+if (flags == 'test') {
+	fs.readFile('weather.json',function(err,fileContents) {
+		if (err) {
+			console.log('failed to load weather.json : '+err);
+		} else {
+			data = fileContents;
+			finish();
+		}
+	});
+} else {
+	waitToFinish();
+}
