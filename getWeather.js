@@ -124,6 +124,11 @@ function printDisplayMessage(env) {
 	});
 }
 
+function hourFromUnixTime(unix_timestamp) {
+	var date = new Date(unix_timestamp*1000);
+	return date.getHours();
+}
+
 function timeFromUnixTime(unix_timestamp) {
 	var date = new Date(unix_timestamp*1000);
 	var hours = date.getHours();
@@ -133,20 +138,35 @@ function timeFromUnixTime(unix_timestamp) {
 }
 
 function describeTemperature(
-	minTemp,minTempTime,
 	maxTemp,maxTempTime,
 	sunrise,sunset,
-	pp,pi,pt,daylightHours) {
-	var mindescription = "min: "+Math.round(minTemp)+"C at "+timeFromUnixTime(minTempTime);
-	var maxdescription = "max: "+Math.round(maxTemp)+"C at "+timeFromUnixTime(maxTempTime);
+	pp,pi,pt,hours) {
+
+	var maxHour = 0;
+	var daylightHours = {};
+	hours.forEach(function (hourData) {
+		var time = hourData.time;
+		var temp = hourData.temperature;
+		if ((time>sunrise) && (time<sunset)) {
+			var hour = hourFromUnixTime(time);
+			daylightHours[hour] = Math.round(temp);
+			console.log(time+' - '+maxTempTime+' - '+(time+3600));
+			if ((time<=maxTempTime) && ((time+3600)>=maxTempTime)) {
+				maxHour = hour;
+			}
+		}
+	});
+
+	var maxdescription = Math.round(maxTemp)+"C";
 	var env = {};
-	env["LOW_TEMP"] = mindescription;
 	env["HIGH_TEMP"] = maxdescription;
-	env["SUNRISE"] = "sunrise: "+timeFromUnixTime(sunrise);
-	env["SUNSET"] = "sunset: "+timeFromUnixTime(sunset);
-	env["PP"] = (pp*100)+"%";
-	env["P"] = pt+" "+pi;
-	// env["DAYLIGHT_HOURS"] = JSON.stringify(daylightHours);
+	env["HIGH_TEMP_HOUR"] = maxHour;
+	env["SUNRISE"] = ""+timeFromUnixTime(sunrise);
+	env["SUNSET"] = ""+timeFromUnixTime(sunset);
+	if (pp>0.1) {
+		env["PP"] = (pp*100)+"%";
+		env["P"] = pt;
+	}
 	fs.writeFile('disp.json',JSON.stringify(env),function(err){
 		if (err) {
 			console.log('could not write disp.json');
@@ -161,81 +181,6 @@ function describeTemperature(
 		}
 	});
 }
-
-function createTempHours(hours,sunrise,sunset) {
-	var daylightHours = {};
-	hours.forEach(function (hour) {
-		var time = parseInt(hour.time);
-		var temp = hour.temperature;
-		if ((time>sunrise) && (time<sunset)) {
-			daylightHours[time] = temp;
-			// daylightHours.push(daylightHour);
-		}
-	});
-	return daylightHours;
-}
-
-// function getBlankTempsArrayForDay(dayStart) {
-// 	var days = {}
-// 	for (i = 0; i < 24; i++) {
-// 		const hour = (i*secondsInAnHour) + dayStart;
-// 		console.log(i);
-// 		console.log(secondsInAnHour);
-// 		console.log(dayStart);
-// 		console.log(hour);
-// 		days[hour] = 0;
-// 	}
-// 	return days;
-// }
-
-// function updateDaylightHoursFile(daylightHours,completion) {
-// 	var daylightKeys = Object.keys(daylightHours);
-// 	if (daylightKeys.length == 0) return; // ignore if no hours to put in
-// 	var todayKey = daylightKeys[0];
-// 	var todayStart = Math.floor(todayKey/secondsInADay)*secondsInADay;
-// 	console.log("today start : "+todayStart);
-// 	var temps;
-// 	fs.readFile('temp.json', 'utf8', function (err, tempData) {
-//   	if (err) {
-//   		console.log('error reading temp.json : '+err);
-//   		completion();
-//   	} else {
-// 		  try {
-// 		    temps = JSON.parse(tempData)
-// 		  } catch (e) {
-// 		    temps = false
-// 		  }
-// 	  	if (temps) {
-// 	  		// existing temperatures make sense, check if it needs updating to today
-// 	  		var tempsKeys = Object.keys(temps);
-// 	  		if (temps[tempsKeys] == todayStart) {
-// 	  			// existing data is valid, just replace the new bits
-// 	  			console.log('replacing new bits');
-// 	  		} else {
-// 	  			// existing data is invalid, probably it's a new day, replace it
-// 	  			temps = getBlankTempsArrayForDay(todayStart);
-// 	  			console.log('started new day, making blank array')
-// 	  		}
-// 	  	} else {
-// 	  		temps = getBlankTempsArrayForDay(todayStart);
-// 	  		console.log('couldnt parse temps, making blank array')
-// 		  	console.log('blank temps:');
-// 		  	console.log(util.inspect(temps, false, null));
-// 	  	}
-// 			Object.keys(daylightHours).forEach(function(key, index) {
-// 			  temps[key] = this[key];
-// 			}, daylightHours);
-// 			console.log("updated temps");
-// 	  	console.log(util.inspect(temps, false, null));
-// 			fs.writeFile('temp.json', JSON.stringify(temps), function (err) {
-// 			  if (err) {
-// 				  console.log("failed to write temp.json : "+err);
-// 			  }
-// 			  completion();
-// 			});
-//   	}
-// 	});
-// }
 
 function finish() {
 	var weather = JSON.parse(data);
@@ -262,8 +207,6 @@ function finish() {
 	var maxTempTime = today.temperatureMaxTime;
 
 	var hours = weather.hourly.data;
-	// console.log(util.inspect(weather, false, null));
-	// console.log(util.inspect(hours, false, null));
 
 	// interpretation
 	var cloudy = cloudCover > 0.5;
@@ -280,28 +223,13 @@ function finish() {
 	var now = Math.floor(Date.now() / 1000);
 	var daytime = now > sunrise && now < sunset;
 	var moon = (sunny && daytime);
-	// output is
-	// cloud, sun, rain, alert, moon, daytime, sleet, snow, hail
-	// like 110011000
-	// var output = (cloudy?"1":"0") + (sunny?"1":"0") + ((rain||sleet)?"1":"0") + (alert?"1":"0") +
-	// (moon?"1":"0") + (daytime?"1":"0") + (icyPrecipitation?"1":"0");
-
-
-	var daylightHours = createTempHours(hours,sunrise,sunset);
 
 	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
 
 	describeTemperature(
-		minTemp,minTempTime,
 		maxTemp,maxTempTime,
 		sunrise,sunset,
-		pp,pi,pt,daylightHours);
-
-	// updateDaylightHoursFile(daylightHours,function() {
-	// 	console.log('DLH DONE');
-	// });
-
-
+		pp,pi,pt,hours);
 
 	var output = {
 		cloudy:cloudy,
