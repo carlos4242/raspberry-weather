@@ -150,7 +150,6 @@ function describeTemperature(
 		if ((time>sunrise) && (time<sunset)) {
 			var hour = hourFromUnixTime(time);
 			daylightHours[hour] = Math.round(temp);
-			console.log(time+' - '+maxTempTime+' - '+(time+3600));
 			if ((time<=maxTempTime) && ((time+3600)>=maxTempTime)) {
 				maxHour = hour;
 			}
