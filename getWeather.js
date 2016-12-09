@@ -15,8 +15,12 @@ config.key+"/"+config.latitude+","+config.longitude+"?units="+units+excludes;
 var finished = false;
 var data = "";
 var waitedCount = 0;
-var whitePin = 21;
-var bluePin = 25;
+
+var yellowPin = 4;
+var greenPin = 22;
+var redPin = 5;
+var whitePin = 17;
+var bluePin = 19;
 
 const outputFilename = "weather.txt";
 
@@ -55,25 +59,25 @@ function waitToFinish() {
 function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp,pi) {
 	var writableStream = fs.createWriteStream('/tmp/flasher');
 	if (snow) {
-		writableStream.write('s:21:150\n');
+		writableStream.write('s:'+whitePin+':150\n');
 	} else if (hail) {
-		writableStream.write('f:21:005\n');
+		writableStream.write('f:'+whitePin+':005\n');
 	} else {
-		writableStream.write('s:21:000\n');
+		writableStream.write('s:'+whitePin+':000\n');
 	}
 
 	if (frost) {
-		writableStream.write('s:12:020\n');
+		writableStream.write('s:'+bluePin+':020\n');
 	} else if (chill) {
-		writableStream.write('s:12:003\n');
+		writableStream.write('s:'+bluePin+':003\n');
 	} else {
-		writableStream.write('s:12:000\n');
+		writableStream.write('s:'+bluePin+':000\n');
 	}
 
 	if (cloudy) {
-		writableStream.write('s:25:255\n');
+		writableStream.write('s:'+greenPin+':255\n');
 	} else {
-		writableStream.write('s:25:000\n');
+		writableStream.write('s:'+greenPin+':000\n');
 	}
 	
 	if (sunny) {
@@ -84,13 +88,13 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 			ss = 0.7;
 		}
 		var suni = (ss / 0.7) * 255;
-		writableStream.write('s:18:'+suni+'\n');
+		writableStream.write('s:'+yellowPin+':'+suni+'\n');
 	} else {
-		writableStream.write('s:18:000\n');
+		writableStream.write('s:'+yellowPin+':000\n');
 	}
 
 	if (alert) {
-		writableStream.write('f:23:004\n');
+		writableStream.write('f:'+redPin+':004\n');
 	} else if (rain) {
 		var ps = pi * 10;
 		if (ps < 0) {
@@ -99,9 +103,9 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 			ps = 1;
 		}
 		var raini = ps * 255 * pp;
-		writableStream.write('s:23:'+raini+'\n');
+		writableStream.write('s:'+redPin+':'+raini+'\n');
 	} else {
-		writableStream.write('s:23:000\n');
+		writableStream.write('s:'+redPin+':000\n');
 	}
 	writableStream.end();
 }
