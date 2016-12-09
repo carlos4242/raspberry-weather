@@ -5,6 +5,7 @@
 
 var http = require('https');
 var fs = require('fs');
+var util = require('util');
 
 var flags = process.argv[2];
 var config = require('./config.json')
@@ -23,6 +24,8 @@ var whitePin = 17;
 var bluePin = 19;
 
 const outputFilename = "weather.txt";
+const secondsInAnHour = 3600;
+const secondsInADay = secondsInAnHour*24;
 
 var clientRequest = http.get(weatherUrl).on('error', function(e) {
 	console.log("Got error: " + e.message);
@@ -110,7 +113,6 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 	writableStream.end();
 }
 
-var util = require('util')
 
 function printDisplayMessage(env) {
 	var scriptFile = __dirname + "/writeDisplay.py";
@@ -126,6 +128,11 @@ function printDisplayMessage(env) {
 	});
 }
 
+function hourFromUnixTime(unix_timestamp) {
+	var date = new Date(unix_timestamp*1000);
+	return date.getHours();
+}
+
 function timeFromUnixTime(unix_timestamp) {
 	var date = new Date(unix_timestamp*1000);
 	var hours = date.getHours();
@@ -134,36 +141,48 @@ function timeFromUnixTime(unix_timestamp) {
 	return formattedTime;
 }
 
-function describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime,daylightHours) {
-	var mindescription = "min: "+Math.round(minTemp)+"C at "+timeFromUnixTime(minTempTime);
-	var maxdescription = "max: "+Math.round(maxTemp)+"C at "+timeFromUnixTime(maxTempTime);
-	// console.log("low temp description : "+mindescription);
-	// console.log("high temp description : "+maxdescription);
-	var env = {};
-	env["LOW_TEMP"] = mindescription;
-	env["HIGH_TEMP"] = maxdescription;
-	env["DAYLIGHT_HOURS"] = daylightHours;
-	printDisplayMessage(env);
-}
+function describeTemperature(
+	maxTemp,maxTempTime,
+	sunrise,sunset,
+	pp,pi,pt,hours) {
 
-function createTempHours(hours,sunrise,sunset) {
-	// console.log(sunrise);
-	// console.log(sunset);
-	var daylightHours = new Array();
-	hours.forEach(function (hour) {
-		var time = hour.time;
-		var temp = hour.temperature;
-		// console.log("hour "+time);
-		// console.log("temp "+temp);
+	var maxHour = 0;
+	var daylightHours = {};
+	hours.forEach(function (hourData) {
+		var time = hourData.time;
+		var temp = hourData.temperature;
 		if ((time>sunrise) && (time<sunset)) {
-			var daylightHour = {time:time,temp:temp};
-			daylightHours.push(daylightHour);
+			var hour = hourFromUnixTime(time);
+			daylightHours[hour] = Math.round(temp);
+			if ((time<=maxTempTime) && ((time+3600)>=maxTempTime)) {
+				maxHour = hour;
+			}
 		}
 	});
-	var daylight = JSON.stringify(daylightHours);
-	// console.log(daylight);
-	// console.log(util.inspect(daylightHours, false, null));
-	return daylight;
+
+	var maxdescription = Math.round(maxTemp)+"C";
+	var env = {};
+	env["HIGH_TEMP"] = maxdescription;
+	env["HIGH_TEMP_HOUR"] = maxHour;
+	env["SUNRISE"] = ""+timeFromUnixTime(sunrise);
+	env["SUNSET"] = ""+timeFromUnixTime(sunset);
+	if (pp>0.1) {
+		env["PP"] = (pp*100)+"%";
+		env["P"] = pt;
+	}
+	fs.writeFile('disp.json',JSON.stringify(env),function(err){
+		if (err) {
+			console.log('could not write disp.json');
+		} else {
+			fs.writeFile('temp.json',JSON.stringify(daylightHours),function(err){
+				if (err) {
+					console.log('coult not write temp.json');
+				} else {
+					printDisplayMessage({});
+				}
+			});
+		}
+	});
 }
 
 function finish() {
@@ -191,8 +210,6 @@ function finish() {
 	var maxTempTime = today.temperatureMaxTime;
 
 	var hours = weather.hourly.data;
-	// console.log(util.inspect(weather, false, null));
-	// console.log(util.inspect(hours, false, null));
 
 	// interpretation
 	var cloudy = cloudCover > 0.5;
@@ -209,11 +226,14 @@ function finish() {
 	var now = Math.floor(Date.now() / 1000);
 	var daytime = now > sunrise && now < sunset;
 	var moon = (sunny && daytime);
-	// output is
-	// cloud, sun, rain, alert, moon, daytime, sleet, snow, hail
-	// like 110011000
-	// var output = (cloudy?"1":"0") + (sunny?"1":"0") + ((rain||sleet)?"1":"0") + (alert?"1":"0") +
-	// (moon?"1":"0") + (daytime?"1":"0") + (icyPrecipitation?"1":"0");
+
+	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
+
+	describeTemperature(
+		maxTemp,maxTempTime,
+		sunrise,sunset,
+		pp,pi,pt,hours);
+
 	var output = {
 		cloudy:cloudy,
 		sunny:sunny,
@@ -238,20 +258,26 @@ function finish() {
 		minTemp:minTemp,
 		apparentMin:apparentMin
 	}
-
-	var daylightHours = createTempHours(hours,sunrise,sunset);
-
-	fs.writeFileSync(outputFilename,JSON.stringify(output, null, 2));
-
-	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
-
-	describeTemperature(minTemp,apparentMin,minTempTime,maxTemp,apparentMax,maxTempTime,daylightHours);
+	fs.writeFile(outputFilename,JSON.stringify(output, null, 2));
 	
 	if (flags == 'today') {
 		console.log(JSON.stringify(today, null, 2));	
 	} else if (flags == 'daily' || flags == 'full') {
-		console.log(JSON.stringify(weather, null, 2));	
+		console.log(JSON.stringify(weather, null, 2));
+	} else if (flags != 'test') {
+		fs.writeFile('weather.json',data);
 	}
 }
 
-waitToFinish();
+if (flags == 'test') {
+	fs.readFile('weather.json',function(err,fileContents) {
+		if (err) {
+			console.log('failed to load weather.json : '+err);
+		} else {
+			data = fileContents;
+			finish();
+		}
+	});
+} else {
+	waitToFinish();
+}
