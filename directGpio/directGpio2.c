@@ -114,7 +114,7 @@ void showHelp(char * basename) {
   printf("\n---\n");
   printf("For dimmer control, send commands to %s, like 1:99, to set brightness of dimmer 1 to 99.\n");
   printf("Or 1:_ to turn off, 1:O to turn back on and 1:? to update/query brightness.\n");
-  printf("The fifos in /tmp/dimmerx will report the current brightness of dimmer x.\n")
+  printf("The fifos in /tmp/dimmerx will report the current brightness of dimmer x.\n");
 }
 
 // thread pin control routine, does timed PWM to control brightness and pulsing
@@ -204,7 +204,11 @@ void *dimmerWriter(void *pptr)
         daemonLog("Opened pipe %s...\n",dimmerPipeName);
 
         // write the status message, then close
-        fprintf(dimmerPipeName, "DMR%d:%d\n", dimmer->dimmer, dimmer->currentBrightness);
+        if (dimmer->currentBrightness==-1) {
+          fprintf(dimmerFile, "DMR%d:_\n", dimmer->dimmer);
+        } else {
+          fprintf(dimmerFile, "DMR%d:%d\n", dimmer->dimmer, dimmer->currentBrightness);
+        }
 
         if (fclose(dimmerFile)) {
           daemonLog("%s failed to close fifo\n",strerror(errno));
@@ -304,16 +308,16 @@ bool readDimmerMessage(char * message, int * dimmerToUpdate, int * newDimmerValu
   dimmerNumberString[0] = message[3];
   dimmerNumberString[1] = 0;
   int dimmerNumber = atoi(dimmerNumberString);
-  if (dimmerNumber<MIN_DIMMER||dimmerNumber>NUM_DIMMERS) return;
+  if (dimmerNumber<MIN_DIMMER||dimmerNumber>NUM_DIMMERS) return false;
   *dimmerToUpdate = dimmerNumber;
   // Then must be an =.
   if (message[4]!='=') return false;
   // Then look for either a _ or read the rest of the line as an integer.
-  if (message[5]=="_") {
+  if (message[5]=='_') {
     *newDimmerValue = -1;
     return true;
   } else {
-    int newDim = atoi(message[5]);
+    int newDim = atoi(message+5);
     if (newDim) {
       *newDimmerValue = newDim;
       return true;
@@ -476,7 +480,7 @@ int main(int argc,char **argv)
             // or we have found the start of a relevant message
             serialBufferPosition++;
           }
-        } else (readb == -1 && errno != EAGAIN && errno != EINTR) {
+        } else if (readb == -1 && errno != EAGAIN && errno != EINTR) {
           // not EOF, this must be an error
           // also it is not EAGAIN or EINTR, which would just mean
           // there was no bytes available or a signal interrupted the read system call
