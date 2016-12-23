@@ -1,0 +1,32 @@
+
+arduino <-> xbee <-> pi serial ttyAMA0 <-> daemon <-> fifos <-> node.js <-> phone
+
+SERIAL LISTEN
+
+any incoming, scan for D and discard all else, when found go into messageStart; scan until \r or \n or buffer full, then look for DMRx=y where x is a character from 1-9 and y is a string
+
+if no match, ignore and go back to discarding
+
+if match, check y is one of _ or a number from 000 to 999
+
+if no match, ignore and go back to discarding
+
+if match, look at x and store the value against the relevant dimmer slot
+
+if a fifo does not exist /tmp/dimmerx then create it and open for writing
+
+
+
+Writeable FIFOs
+
+If someone reads a value from them, write out the current value last stored.
+
+
+Readable FIFO
+
+Use the same fifo as the dimmer.  If contention becomes a problem later, we shall fix it.
+
+Read for complete records like XYZABC<lf>.  They must be complete, ending in LF (asci 0xA).
+When a record is read, match to the pattern x:y.  x must be a number from 1-9. y must be one of the strings _ or O or ? or a number from 000-999.
+
+If invalid discard and ignore.  If valid, send the whole string, including LF to the serial port, prefixed by "DMR".
