@@ -30,3 +30,22 @@ Read for complete records like XYZABC<lf>.  They must be complete, ending in LF 
 When a record is read, match to the pattern x:y.  x must be a number from 1-9. y must be one of the strings _ or O or ? or a number from 000-999.
 
 If invalid discard and ignore.  If valid, send the whole string, including LF to the serial port, prefixed by "DMR".
+
+
+
+
+
+commands
+***
+
+FIFO command structure for existing commands is...
+
+s:<pin>:<brightness>   (min:0 - max:255)
+s:XX:YYY\
+  0123456
+0123456
+
+f:<pin>:<period> (min:1 - max:999)
+
+p:<pin>:0
+p:<pin>:1

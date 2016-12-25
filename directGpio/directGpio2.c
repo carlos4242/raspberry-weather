@@ -58,7 +58,7 @@
 #define dutyCycle 10000
 
 // dimmer interface via xbee/arduino...
-#define xbeeSerialBufferLength 7
+#define xbeeSerialBufferLength 8
 
 
 // filenames
@@ -78,10 +78,10 @@ bool testMode = false;
 // *** Structures, global memory, interrupt/signal handlers  *** /
 
 // latest dimmer state
-typedef struct {
-  char * latest;
-} dimmer_state_t;
-dimmer_state_t dimmerStates[10] = {0};
+// typedef struct {
+//   char * latest;
+// } dimmer_state_t;
+// dimmer_state_t dimmerStates[10] = {0};
 
 // one thread for each pin to be PWMed
 typedef struct {
@@ -98,6 +98,7 @@ typedef struct {
   unsigned char dimmer;
   pthread_t thread;
   int currentBrightness;
+  int requestedBrightness;
 } dmr_t;
 dmr_t dimmers[NUM_DIMMERS] = {0};
 
@@ -307,7 +308,7 @@ void *serialPortRead(void *pptr) {
     return NULL;
   }
 
-  daemonLog("serial port read thread started\n");
+  daemonLog("serial port read thread started (reading %s)\n",xbeeSerialPort);
 
   while (keepRunning) {
     // and read serial port for incoming messages
@@ -371,10 +372,13 @@ Setup/cleanup routines (including signal handling).
 // steady...
 // s:XX:Y, where XX is the pin number and Y is the brightness (0-255)
 // flashing...
-// f:XX:Y, where XX is the pin number and Y is the flashing speed (0-255)
+// f:XX:Y, where XX is the pin number and Y is the flashing speed, the flash period as a multiple of 0.2s (0-999)
 
 // FOR POWER CONTROL (mains relays, etc.)
 // p:XX:Y, where XX is the pin number and Y is 0 or 1 for on or off
+
+// For dimmer control
+// d:XX:YYY, XX is trimmed to 1-9 (or whatever the min and max are for dimmers), YYY is the brightness: limited 01-99
 
 // Note: do not use LED control signals (s: or f:) to control a relay.
 // It will send a PWM signal that will probably not activate the relay cleanly and may damage it.
@@ -383,7 +387,7 @@ void doControlMessage(char * message) {
   bool steadyMsg=strncmp(message,"s:",2)==0;
   bool flashMsg=strncmp(message,"f:",2)==0;
   bool relayControlMsg=strncmp(message,"p:",2)==0;
-  bool dimmerMsg=strncmp(message,"p:",2)==0;
+  bool dimmerMsg=strncmp(message,"d:",2)==0;
   if (steadyMsg||flashMsg||relayControlMsg||dimmerMsg) { 
     daemonLog("received control message %s\n",message);
     message+=2;
@@ -392,15 +396,18 @@ void doControlMessage(char * message) {
       char pinBuf[3]={0};
       strncpy(pinBuf,message,2);
       unsigned char pin = atoi(pinBuf);
+      message+=3;
+      unsigned char newParameter = atoi(message);
       if (dimmerMsg) {
         // send message to dimmer
+        if (pin >= MIN_DIMMER && pin <= NUM_DIMMERS) {
+          dimmers[pin].requestedBrightness = newParameter;
+        }
       } else {
         daemonLog("adjusting pin %d\n",pin);
         if (pin >= MIN_PIN && pin < NUM_PINS) {
           INP_GPIO(pin);
           OUT_GPIO(pin); // Define pin as output
-          message+=3;
-          unsigned char newParameter = atoi(message);
           if (steadyMsg) {
             pins[pin].flashPeriod=0;
             pins[pin].brightness=fmaxf(fminf((float)newParameter,maxBrightness),minBrightness);
