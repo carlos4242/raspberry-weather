@@ -62,14 +62,15 @@
 
 
 // filenames
-char * flasherPipe = "/tmp/flasher";
-char * flasherPwd = "/tmp";
-char * flasherLog = "/tmp/flasher.log";
-char * statsFilePath = "/tmp/flasher.stats";
-char * dimmerStatusRoot = "/tmp/dimmer";
+char * flasherPipe = "flasher";
+char * flasherPwd = NULL;
+char * flasherLog = "flasher.log";
+char * statsFilePath = "flasher.status";
+char * dimmerStatusRoot = "dimmer";
 char * xbeeSerialPort = "/dev/ttyAMA0";
 
-
+// test mode, create a fake dimmer
+bool testMode = false;
 
 
 
@@ -265,7 +266,7 @@ void *dimmerWriter(void *pptr)
         daemonLog("Opened pipe %s...\n",dimmerPipeName);
 
         // write the status message, then close
-        fprintf(dimmerFile, "DMR%d:%d\n", dimmer->dimmer, dimmer->currentBrightness);
+        fprintf(dimmerFile, "%d\n", dimmer->currentBrightness);
 
         if (fclose(dimmerFile)) {
           daemonLog("%s failed to close fifo\n",strerror(errno));
@@ -494,6 +495,10 @@ void startSerialReadThread() {
 }
 
 void becomeDaemon() {
+  if (flasherPwd&&(chdir(flasherPwd)) < 0) {
+    daemonLog("%s failed to chdir\n",strerror(errno));
+    exit(EXIT_FAILURE);
+  }
   // now the initial setup is done, attempt to make ourselves a daemon before continuing
   // all logging from now on goes to a dedicated log file
   // (from http://www.netzmafia.de/skripten/unix/linux-daemon-howto.html)
@@ -516,10 +521,6 @@ void becomeDaemon() {
   sid = setsid();
   if (sid < 0) {
     daemonLog("%s failed to setsid\n",strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-  if ((chdir(flasherPwd)) < 0) {
-    daemonLog("%s failed to chdir\n",strerror(errno));
     exit(EXIT_FAILURE);
   }
   close(STDIN_FILENO);  // this is enough to stop the daemon from working
@@ -600,8 +601,8 @@ void openFifoWaitForMessagesUntilDaemonKilled() {
       if (fclose(flasherfile)) {
         daemonLog("%s failed to close fifo\n",strerror(errno));
       }
-    } else {
-      daemonLog("%s failed to open fifo\n",strerror(errno));
+    } else if (errno!=EINTR) {
+      daemonLog("%s failed to open fifo (%d)\n",strerror(errno),errno);
     }
 
     if (unlink(flasherPipe)) {
@@ -613,8 +614,8 @@ void openFifoWaitForMessagesUntilDaemonKilled() {
 }
 
 void cleanupStatsFile() {
-  if (unlink(statsFilePath)) {
-    daemonLog("%s failed to cleanup stats\n",strerror(errno));
+  if (unlink(statsFilePath)&&errno!=ENOENT) {
+    daemonLog("%s failed to cleanup stats (%d)\n",strerror(errno),errno);
   }
 }
 
@@ -632,12 +633,13 @@ void showHelp(char * executableFilename) {
   char *rootFilename = basename(executableFilename);
   printf("\n%s runs as a daemon\n",rootFilename);
 
-  printf("-s <port>    : open serial port for communication with dimmers\n");
-  printf("-f <fifo>    : control fifo path, otherwise defaults to /tmp/flasher\n");
-  printf("-d <dbgfile> : stats/debug file while running, otherwise defaults to /tmp/flasher.stats\n");
-  printf("-l <logfile> : log file, otherwise defaults to /tmp/flasher.log\n");
-  printf("-w <workingDirectory> : otherwise defaults to /tmp\n");
-  printf("-r <dimmerStatusRoot> : the root for dimmer status fifo files, otherwise defaults /tmp/dimmer\n");
+  printf("-s <serial port>  : open <serial port> for communication with dimmers.\n");
+  printf("-f <fifo>         : control fifo path, otherwise (defaults to /tmp/flasher)\n");
+  printf("-d <dbgfile>      : stats/debug file while running, otherwise (defaults to /tmp/flasher.stats)\n");
+  printf("-l <logfile>      : log file, otherwise (defaults to /tmp/flasher.log)\n");
+  printf("-w <workingDirectory> : otherwise (defaults to /tmp)\n");
+  printf("-r <dimmerStatusRoot> : the root for dimmer status fifo files, otherwise (defaults /tmp/dimmer)\n");
+  printf("--mode test : Enable test mode (outputs 50 on dimmer socket 1).\n");
 
   
   printf("\n\n");
@@ -660,45 +662,57 @@ void interpretCommandLineParameters(int argc,char **argv) {
   // -l <logfile> : log file, otherwise defaults to /tmp/flasher.log
   // -w <workingDirectory> : otherwise defaults to /tmp
   // -r <dimmerStatusRoot> : the root for dimmer status fifo files, otherwise defaults /tmp/dimmer
+  // --mode test : Enable test mode (outputs 50 on dimmer socket 1).
 
   bool help = false;
-  for (int i=0;i<argc;i++) {
-    if (strcmp("-s",argv[i])==0) {
-      if (++i<argc) {
-        xbeeSerialPort = argv[i];
-      } else help = true;
-    } else if (strcmp("-f",argv[i])==0) {
-      if (++i<argc) {
-        flasherPipe = argv[i];
-      } else help = true;
-    } else if (strcmp("-d",argv[i])==0) {
-      if (++i<argc) {
-        statsFilePath = argv[i];
-      } else help = true;
-    } else if (strcmp("-l",argv[i])==0) {
-      if (++i<argc) {
-        flasherLog = argv[i];
-      } else help = true;
-    } else if (strcmp("-w",argv[i])==0) {
-      if (++i<argc) {
-        flasherPwd = argv[i];
-      } else help = true;
-    } else if (strcmp("-r",argv[i])==0) {
-      if (++i<argc) {
-        dimmerStatusRoot = argv[i];
-        // test max length etc. for edge cases
-        const int dimmerStatusRootMaxLength = 255;
-        int dimmerStatusRootLength = strnlen(dimmerStatusRoot,dimmerStatusRootMaxLength);
-        if (dimmerStatusRootLength==dimmerStatusRootMaxLength) {
-          printf("WARNING ** dimmer status root was too long, truncating to 255 characters!\n");
-          dimmerStatusRoot[dimmerStatusRootLength] = 0;
-        }
-      } else help = true;
+
+  if ((argc%2)==1) {
+    for (int i=0;i<argc;i++) {
+      if (strcmp("-s",argv[i])==0) {
+        if (++i<argc) {
+          xbeeSerialPort = argv[i];
+        } else help = true;
+      } else if (strcmp("-f",argv[i])==0) {
+        if (++i<argc) {
+          flasherPipe = argv[i];
+        } else help = true;
+      } else if (strcmp("-d",argv[i])==0) {
+        if (++i<argc) {
+          statsFilePath = argv[i];
+        } else help = true;
+      } else if (strcmp("-l",argv[i])==0) {
+        if (++i<argc) {
+          flasherLog = argv[i];
+        } else help = true;
+      } else if (strcmp("-w",argv[i])==0) {
+        if (++i<argc) {
+          flasherPwd = argv[i];
+        } else help = true;
+      } else if (strcmp("-r",argv[i])==0) {
+        if (++i<argc) {
+          dimmerStatusRoot = argv[i];
+          // test max length etc. for edge cases
+          const int dimmerStatusRootMaxLength = 255;
+          int dimmerStatusRootLength = strnlen(dimmerStatusRoot,dimmerStatusRootMaxLength);
+          if (dimmerStatusRootLength==dimmerStatusRootMaxLength) {
+            printf("WARNING ** dimmer status root was too long, truncating to 255 characters!\n");
+            dimmerStatusRoot[dimmerStatusRootLength] = 0;
+          }
+        } else help = true;
+      } else if (strcmp("--mode",argv[i])==0) {
+        if (++i<argc&&strcmp("test",argv[i])==0) {
+          testMode = true;
+        } else help = true;
+      }
     }
+  } else {
+    help = true;
   }
 
-  showHelp(argv[0]);
-  exit(EXIT_SUCCESS);
+  if (help) {
+    showHelp(argv[0]);
+    exit(EXIT_SUCCESS);
+  }
 }
 
 
@@ -739,11 +753,15 @@ int main(int argc,char **argv)
 
 
 
+  // testing
+
+  if (testMode) {
+    updateDimmerStatus(1,50);
+  }
+
+
 
   // loop
-
-  /* *** TEST CODE *** */
-  updateDimmerStatus(1,50); // SUM TEST STUF
   openFifoWaitForMessagesUntilDaemonKilled();
 
 
