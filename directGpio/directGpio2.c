@@ -50,6 +50,7 @@
 #define MIN_PIN 1 // for now, pin 0 is invalid, fix this later if needed
 #define MIN_DIMMER 1
 #define dimmerStatusMaxExtensionLength 2
+#define SERIAL_OUT_BUFSIZE 8
 
 // PWM
 #define maxBrightness 255.0
@@ -101,6 +102,9 @@ typedef struct {
   int requestedBrightness;
 } dmr_t;
 dmr_t dimmers[NUM_DIMMERS] = {0};
+
+
+char serialOutBuffer[SERIAL_OUT_BUFSIZE];
 
 
 // handle graceful shutdown
@@ -298,6 +302,12 @@ void *dimmerWriter(void *pptr)
   return NULL;
 }
 
+// this is populated once the port is successfully opened
+// and is set back to 0 before it is closed
+// so as a writer thread, you know if it has a non zero value, you're good to write 
+int openedSerialPort = 0;
+
+
 // serial port reader thread
 void *serialPortRead(void *pptr) {
 
@@ -308,6 +318,7 @@ void *serialPortRead(void *pptr) {
     return NULL;
   }
 
+  openedSerialPort = xb;
   daemonLog("serial port read thread started (reading %s)\n",xbeeSerialPort);
 
   while (keepRunning) {
@@ -342,6 +353,7 @@ void *serialPortRead(void *pptr) {
     usleep(dutyCycle); // reduce CPU load
   }
 
+  openedSerialPort = 0;
   close(xb);
 
   daemonLog("closed serial port read and stopped thread\n");
@@ -402,6 +414,13 @@ void doControlMessage(char * message) {
         // send message to dimmer
         if (pin >= MIN_DIMMER && pin <= NUM_DIMMERS) {
           dimmers[pin].requestedBrightness = newParameter;
+	  if (openedSerialPort) {
+	    static char serialOutBuffer[SERIAL_OUT_BUFSIZE];
+	    sprintf(serialOutBuffer,"DMR%d:%02d\n",pin,newParameter);
+	    if (write(openedSerialPort,serialOutBuffer,SERIAL_OUT_BUFSIZE)<0) {
+	      daemonLog("Problem writing to serial port (%d) - (%s)",errno,strerror(errno));
+	    }
+	  } 
         }
       } else {
         daemonLog("adjusting pin %d\n",pin);
