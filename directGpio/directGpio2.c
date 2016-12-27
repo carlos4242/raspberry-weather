@@ -1,4 +1,29 @@
+/*** Defines, Includes and Macros ***/
+
+
+#ifndef mac
+
 #include "PJ_RPI.h"
+
+// map the gpio area, if we can't do this, there's no point even trying to be a daemon
+#define SETUP_GPIO() do {\
+  if (map_peripheral(&gpio) == -1) {\
+    printf("Failed to map the physical GPIO registers into the virtual memory space.\n");\
+    return -1;\
+  }\
+} while (false);
+
+#else
+
+#define GPIO_CLR int dummy
+#define GPIO_SET int dummy
+#define INP_GPIO(x) 
+#define OUT_GPIO(x) 
+
+#define SETUP_GPIO() 
+
+#endif
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <signal.h>
@@ -8,35 +33,54 @@
 #include <errno.h>
 #include <float.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <libgen.h>
+
 
 #define CMD_BUF 1024
+
+// limits
 #define NUM_PINS 26
 #define NUM_DIMMERS 9 // arbitrary limit, although 10 is a lot and keeps message format to 1 character there
 #define MIN_PIN 1 // for now, pin 0 is invalid, fix this later if needed
 #define MIN_DIMMER 1
-#define flasherPipe "/tmp/flasher"
-#define flasherPwd "/tmp"
-#define flasherLog "/tmp/flasher.log"
-#define statsFilePath "/tmp/flasher.stats"
-#define dimmerStatusRoot "/tmp/dimmer"
-#define dimmerStatusMaxFilenameLength 20
+#define dimmerStatusMaxExtensionLength 2
+
+// PWM
 #define maxBrightness 255.0
 #define minBrightness 0.0
 #define brightnessStep 1.0
 #define dutyCycle 10000
-// #define min(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1<_2?_1:_2;})
-// #define max(x,y) ({typeof(x)_1=(x);typeof(y)_2=(y);(void)(&_1==&_2);_1>_2?_1:_2;})
 
 // dimmer interface via xbee/arduino...
-#define xbeeSerialPort "/dev/ttyAMA0"
 #define xbeeSerialBufferLength 7
+
+
+// filenames
+char * flasherPipe = "/tmp/flasher";
+char * flasherPwd = "/tmp";
+char * flasherLog = "/tmp/flasher.log";
+char * statsFilePath = "/tmp/flasher.stats";
+char * dimmerStatusRoot = "/tmp/dimmer";
+char * xbeeSerialPort = "/dev/ttyAMA0";
+
+
+
+
+
+
+// *** Structures, global memory, interrupt/signal handlers  *** /
 
 // latest dimmer state
 typedef struct {
   char * latest;
 } dimmer_state_t;
 dimmer_state_t dimmerStates[10] = {0};
-
 
 // one thread for each pin to be PWMed
 typedef struct {
@@ -56,11 +100,21 @@ typedef struct {
 } dmr_t;
 dmr_t dimmers[NUM_DIMMERS] = {0};
 
+
 // handle graceful shutdown
 bool keepRunning = true;
 void sigInt(int signal) {
   keepRunning = false;
 }
+
+
+
+
+
+
+
+
+// *** Simple, self contained utility functions, logging, debug, etc.  *** /
 
 // handle logging
 FILE * debugFile = NULL;
@@ -91,11 +145,14 @@ void dumpStatsFile() {
   FILE * statsFile = fopen(statsFilePath, "w+");
   if (statsFile) {
     daemonLog("created stats file\n");
+
     for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
       if (pins[pin].thread) {
-        fprintf(statsFile,"pin %d : flash = %lu, brightness = %.0f, power = %d\n",pin,pins[pin].flashPeriod,pins[pin].brightness,pins[pin].powerOn);
+        fprintf(statsFile,"pin %d : flash = %lu, brightness = %.0f, power = %d\n",
+          pin,(unsigned long)pins[pin].flashPeriod,pins[pin].brightness,pins[pin].powerOn);
       }
     }
+
     fclose(statsFile);
     daemonLog("finished stats file and closed\n");
   } else {
@@ -103,19 +160,21 @@ void dumpStatsFile() {
   }
 }
 
-// handle help
-void showHelp(char * basename) {
-  printf("%s runs as a daemon\n",basename);
-  printf("To control a running daemon: echo (p|s|f):XX:YYY > %s\n",flasherPipe);
-  printf("s - steady LED brightness, f - flashing LED, p - power on/off (for relays)\n");
-  printf("XX - pin number 0-%d\n",NUM_PINS);
-  printf("YYY - brightness (0-255), flash period in 10ths of a second (1-999) or 1/0 if simple power control\n");
-  printf("SIGHUP, SIGINT or SIGTERM to cleanly shut down the daemon\n");
-  printf("\n---\n");
-  printf("For dimmer control, send commands to %s, like 1:99, to set brightness of dimmer 1 to 99.\n");
-  printf("Or 1:_ to turn off, 1:O to turn back on and 1:? to update/query brightness.\n");
-  printf("The fifos in /tmp/dimmerx will report the current brightness of dimmer x.\n")
-}
+// forward declarations
+bool readDimmerMessage(char * message, int * dimmerToUpdate, int * newDimmerValue);
+void updateDimmerStatus(unsigned char dimmer, int newValue);
+
+
+
+
+
+
+
+
+
+
+// *** Threading, thread functions... control pin PWM, read serial port, write status FIFOs.  *** /
+
 
 // thread pin control routine, does timed PWM to control brightness and pulsing
 void *flasher(void *pptr)
@@ -187,8 +246,10 @@ void *dimmerWriter(void *pptr)
   dmr_t *dimmer = (dmr_t*)pptr;
   daemonLog("started thread for dimmer %d\n",dimmer->dimmer);
 
-  char dimmerPipeName[dimmerStatusMaxFilenameLength];
-  snprintf(dimmerPipeName,dimmerStatusMaxFilenameLength,"%s%d",dimmerStatusRoot,dimmer->dimmer);
+  const int dimmerStatusPathLength = strlen(dimmerStatusRoot)+dimmerStatusMaxExtensionLength;
+  char * dimmerPipeName = malloc(dimmerStatusPathLength);
+
+  snprintf(dimmerPipeName,dimmerStatusPathLength,"%s%d",dimmerStatusRoot,dimmer->dimmer);
   daemonLog("preparing pipe for write of status : %s\n",dimmerPipeName);
 
   unlink(dimmerPipeName);
@@ -198,13 +259,13 @@ void *dimmerWriter(void *pptr)
 
     while(keepRunning)
     {
-      FILE * dimmerFile = fopen(dimmerPipeName,"r");
+      FILE * dimmerFile = fopen(dimmerPipeName,"w");
       if (dimmerFile) {
         // this logging will be excessive once the program is working nominially and can be removed then
         daemonLog("Opened pipe %s...\n",dimmerPipeName);
 
         // write the status message, then close
-        fprintf(dimmerPipeName, "DMR%d:%d\n", dimmer->dimmer, dimmer->currentBrightness);
+        fprintf(dimmerFile, "DMR%d:%d\n", dimmer->dimmer, dimmer->currentBrightness);
 
         if (fclose(dimmerFile)) {
           daemonLog("%s failed to close fifo\n",strerror(errno));
@@ -218,6 +279,8 @@ void *dimmerWriter(void *pptr)
           daemonLog("Problem opening pipe %s (%s)...\n",dimmerPipeName,strerror(errno));
         }
       }
+
+      usleep(dutyCycle); // reduce CPU load and prevent multiple opening
     }
 
     if (unlink(dimmerPipeName)) {
@@ -226,12 +289,79 @@ void *dimmerWriter(void *pptr)
   } else {
     daemonLog("Problem making pipe %s (%d)...\n",dimmerPipeName,errno);
   }
+
+  free(dimmerPipeName);
  
   daemonLog("thread for dimmer %d finished\n",dimmer->dimmer);
   return NULL;
 }
 
+// serial port reader thread
+void *serialPortRead(void *pptr) {
 
+  // attempt to open the serial port
+  int xb = open(xbeeSerialPort,O_RDWR|O_NOCTTY|O_NONBLOCK);
+  if (xb==-1) {
+    daemonLog("Failed to open serial port %s - %s (%d)\n",xbeeSerialPort,strerror(errno),errno);
+    return NULL;
+  }
+
+  daemonLog("serial port read thread started\n");
+
+  while (keepRunning) {
+    // and read serial port for incoming messages
+    static int serialBufferPosition = 0;
+    static char serialBuffer[xbeeSerialBufferLength];
+    int readb = read(xb,serialBuffer+serialBufferPosition,1);
+    if (readb > 0) {
+      // byte available, process like we would with the Arduino code
+      if (serialBufferPosition == xbeeSerialBufferLength - 1) {
+        // message is complete
+        serialBuffer[xbeeSerialBufferLength-1] = 0;
+        daemonLog("Received message from serial port - %s\n",serialBuffer);
+        // interpret the serial command
+        int dimmerNumber,newDimmerValue;
+        if (readDimmerMessage(serialBuffer,&dimmerNumber,&newDimmerValue)) {
+          updateDimmerStatus(dimmerNumber,newDimmerValue);
+        }
+        serialBufferPosition = 0;
+      } else if (serialBufferPosition||serialBuffer[0] == 'D') {
+        // we are already loading a message, move the pointer along
+        // or we have found the start of a relevant message
+        serialBufferPosition++;
+      }
+    } else if (readb == -1 && errno != EAGAIN && errno != EINTR) {
+      // not EOF, this must be an error
+      // also it is not EAGAIN or EINTR, which would just mean
+      // there was no bytes available or a signal interrupted the read system call
+      daemonLog("Error reading from the serial port %s - %s (%d)\n",xbeeSerialPort,strerror(errno),errno);
+    }
+
+    usleep(dutyCycle); // reduce CPU load
+  }
+
+  close(xb);
+
+  daemonLog("closed serial port read and stopped thread\n");
+  return NULL;
+}
+
+
+
+
+
+
+
+/*** Core business logic functions.
+
+Interpret inbound FIFO commands, command line parameters.
+Interpret inbound serial messages from remote Arduinos.
+Spawn, control and end threads.
+Daemonise.
+Setup/cleanup routines (including signal handling).
+
+
+*/
 
 
 // interpret the control message from the pipe
@@ -245,13 +375,15 @@ void *dimmerWriter(void *pptr)
 // FOR POWER CONTROL (mains relays, etc.)
 // p:XX:Y, where XX is the pin number and Y is 0 or 1 for on or off
 
-// Note: do not use LED control signals (s: or f:) to control a relay.  It will send a PWM signal that will probably not activate the relay cleanly and may damage it.
+// Note: do not use LED control signals (s: or f:) to control a relay.
+// It will send a PWM signal that will probably not activate the relay cleanly and may damage it.
 
 void doControlMessage(char * message) {
   bool steadyMsg=strncmp(message,"s:",2)==0;
   bool flashMsg=strncmp(message,"f:",2)==0;
   bool relayControlMsg=strncmp(message,"p:",2)==0;
-  if (steadyMsg||flashMsg||relayControlMsg) { 
+  bool dimmerMsg=strncmp(message,"p:",2)==0;
+  if (steadyMsg||flashMsg||relayControlMsg||dimmerMsg) { 
     daemonLog("received control message %s\n",message);
     message+=2;
     message[6]=0;
@@ -259,34 +391,38 @@ void doControlMessage(char * message) {
       char pinBuf[3]={0};
       strncpy(pinBuf,message,2);
       unsigned char pin = atoi(pinBuf);
-      daemonLog("adjusting pin %d\n",pin);
-      if (pin >= MIN_PIN && pin < NUM_PINS) {
-        INP_GPIO(pin);
-        OUT_GPIO(pin); // Define pin as output
-        message+=3;
-        unsigned char newParameter = atoi(message);
-        if (steadyMsg) {
-          pins[pin].flashPeriod=0;
-          pins[pin].brightness=fmaxf(fminf((float)newParameter,maxBrightness),minBrightness);
-          daemonLog("parameter is %s, interpreted as brightness %f\n",message,pins[pin].brightness);
-        } else if (flashMsg) {
-          if (newParameter<=0) newParameter = 1;
-          pins[pin].flashPeriod=100000*newParameter;
-          daemonLog("parameter is %s, interpreted as flash period %lu\n",message,pins[pin].flashPeriod);
-        } else if (relayControlMsg) {
-          newParameter=(bool)newParameter;
-          pins[pin].powerOn=newParameter;
-          pins[pin].flashPeriod=0;
-          pins[pin].brightness=0;
-          daemonLog("parameter is %s, interpreted as power on %d\n",message,pins[pin].powerOn);
-        }
-        if (!pins[pin].thread) {
-          int pin_thread_success = pthread_create(&pins[pin].thread, NULL, flasher, (void*)&pins[pin]);
-          assert(0 == pin_thread_success);
-          daemonLog("created thread for pin %d\n",pin);
-        }
+      if (dimmerMsg) {
+        // send message to dimmer
       } else {
-        daemonLog("invalid pin %d",pin);
+        daemonLog("adjusting pin %d\n",pin);
+        if (pin >= MIN_PIN && pin < NUM_PINS) {
+          INP_GPIO(pin);
+          OUT_GPIO(pin); // Define pin as output
+          message+=3;
+          unsigned char newParameter = atoi(message);
+          if (steadyMsg) {
+            pins[pin].flashPeriod=0;
+            pins[pin].brightness=fmaxf(fminf((float)newParameter,maxBrightness),minBrightness);
+            daemonLog("parameter is %s, interpreted as brightness %f\n",message,pins[pin].brightness);
+          } else if (flashMsg) {
+            if (newParameter<=0) newParameter = 1;
+            pins[pin].flashPeriod=100000*newParameter;
+            daemonLog("parameter is %s, interpreted as flash period %lu\n",message,pins[pin].flashPeriod);
+          } else if (relayControlMsg) {
+            newParameter=(bool)newParameter;
+            pins[pin].powerOn=newParameter;
+            pins[pin].flashPeriod=0;
+            pins[pin].brightness=0;
+            daemonLog("parameter is %s, interpreted as power on %d\n",message,pins[pin].powerOn);
+          }
+          if (!pins[pin].thread) {
+            int pin_thread_success = pthread_create(&pins[pin].thread, NULL, flasher, (void*)&pins[pin]);
+            assert(0 == pin_thread_success);
+            daemonLog("created thread for pin %d\n",pin);
+          }
+        } else {
+          daemonLog("invalid pin %d",pin);
+        }
       }
     } else {
       daemonLog("invalid length control message - should be _:XX:YYY was %d - %s\n",strnlen(message,6),message);
@@ -304,16 +440,16 @@ bool readDimmerMessage(char * message, int * dimmerToUpdate, int * newDimmerValu
   dimmerNumberString[0] = message[3];
   dimmerNumberString[1] = 0;
   int dimmerNumber = atoi(dimmerNumberString);
-  if (dimmerNumber<MIN_DIMMER||dimmerNumber>NUM_DIMMERS) return;
+  if (dimmerNumber<MIN_DIMMER||dimmerNumber>NUM_DIMMERS) return false;
   *dimmerToUpdate = dimmerNumber;
   // Then must be an =.
   if (message[4]!='=') return false;
   // Then look for either a _ or read the rest of the line as an integer.
-  if (message[5]=="_") {
+  if (message[5]=='_') {
     *newDimmerValue = -1;
     return true;
   } else {
-    int newDim = atoi(message[5]);
+    int newDim = atoi(message+5);
     if (newDim) {
       *newDimmerValue = newDim;
       return true;
@@ -333,7 +469,15 @@ void updateDimmerStatus(unsigned char dimmer, int newValue) {
   }
 }
 
+pthread_t serialReadThread = 0;
+
 void closeDimmerStatusThreads() {
+  if (serialReadThread) {
+    pthread_kill(serialReadThread,SIGUSR1);
+    pthread_join(serialReadThread,NULL);
+    daemonLog("Serial read thread done\n");
+  }
+
   for (unsigned char dimmer = MIN_DIMMER;dimmer<NUM_DIMMERS;dimmer++) {
     if (dimmers[dimmer].thread) {
       pthread_kill(dimmers[dimmer].thread,SIGUSR1);
@@ -343,56 +487,13 @@ void closeDimmerStatusThreads() {
   }
 }
 
-// the main control function
-// print help, if needed, setup signal handling for clean daemon exit, setup GPIO
-// daemonize, setup fifo and wait for instructions
-int main(int argc,char **argv)
-{
-  // emit help and exit cleanly if they specify any parameters
-  if (argc>1) {
-    showHelp(argv[0]);
-    return 0;
+void startSerialReadThread() {
+  if (pthread_create(&serialReadThread, NULL, serialPortRead, NULL)) {
+    daemonLog("Failed to create serial read thread %d\n",errno);
   }
+}
 
-  // prepare signal handling for when we're a daemon (or not)
-  struct sigaction new_action, old_action;
-  new_action.sa_handler = sigInt;
-  sigemptyset (&new_action.sa_mask);
-  new_action.sa_flags = 0;
-  sigaction (SIGINT, NULL, &old_action);
-  if (old_action.sa_handler != SIG_IGN) {
-    sigaction (SIGINT, &new_action, NULL);
-  }
-  sigaction (SIGHUP, NULL, &old_action);
-  if (old_action.sa_handler != SIG_IGN) {
-    sigaction (SIGHUP, &new_action, NULL);
-  }
-  sigaction (SIGTERM, NULL, &old_action);
-  if (old_action.sa_handler != SIG_IGN) {
-    sigaction (SIGTERM, &new_action, NULL);
-  }
-
-  // this signal is used internally, sent from main thread
-  // to some worker threads, mainly to cause their blocking open() or write()
-  // calls to drop out with error EINTR so the code can check for keepRunning==false
-  // and exit cleanly if so
-  sigaction (SIGUSR1, &new_action, NULL);
-
-  // this is probably overkill, I think Linux doesn't restart by default if flags = 0 on sigaction anyway
-  // but call it to be sure
-  siginterrupt(SIGUSR1, 1);
-
-  // ignore pipe signals, we are probably just closing a writer and got a race condition
-  new_action.sa_handler = SIG_IGN;
-  sigaction (SIGPIPE, &new_action, NULL);
-
-  // map the gpio area, if we can't do this, there's no point even trying to be a daemon
-  if(map_peripheral(&gpio) == -1) 
-  {
-    printf("Failed to map the physical GPIO registers into the virtual memory space.\n");
-    return -1;
-  }
-
+void becomeDaemon() {
   // now the initial setup is done, attempt to make ourselves a daemon before continuing
   // all logging from now on goes to a dedicated log file
   // (from http://www.netzmafia.de/skripten/unix/linux-daemon-howto.html)
@@ -425,26 +526,64 @@ int main(int argc,char **argv)
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
   // we are now a daemon, logging to file
-  daemonLog("daemon running\n");
+  daemonLog("daemon running (%d)\n",getpid());
+}
 
+void setupSignalHandling() {
+  // prepare signal handling for when we're a daemon (or not)
+  struct sigaction new_action, old_action;
+  new_action.sa_handler = sigInt;
+  sigemptyset (&new_action.sa_mask);
+  new_action.sa_flags = 0;
+  sigaction (SIGINT, NULL, &old_action);
+  if (old_action.sa_handler != SIG_IGN) {
+    sigaction (SIGINT, &new_action, NULL);
+  }
+  sigaction (SIGHUP, NULL, &old_action);
+  if (old_action.sa_handler != SIG_IGN) {
+    sigaction (SIGHUP, &new_action, NULL);
+  }
+  sigaction (SIGTERM, NULL, &old_action);
+  if (old_action.sa_handler != SIG_IGN) {
+    sigaction (SIGTERM, &new_action, NULL);
+  }
+
+  // this signal is used internally, sent from main thread
+  // to some worker threads, mainly to cause their blocking open() or write()
+  // calls to drop out with error EINTR so the code can check for keepRunning==false
+  // and exit cleanly if so
+  sigaction (SIGUSR1, &new_action, NULL);
+
+  // this is probably overkill, I think Linux doesn't restart by default if flags = 0 on sigaction anyway
+  // but call it to be sure
+  siginterrupt(SIGUSR1, 1);
+
+  // ignore pipe signals, we are probably just closing a writer and got a race condition
+  new_action.sa_handler = SIG_IGN;
+  sigaction (SIGPIPE, &new_action, NULL);
+}
+
+void initialisePwmPinsState() {
   // then initialise one flasher structure for each pin we may use
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
     pins[pin].pin = pin;
   }
+}
 
+void initialiseDimmerControlState() {
   // then initialise one dimmer structure for each dimmer we may use
   for (unsigned char dimmer = MIN_DIMMER;dimmer<NUM_DIMMERS;dimmer++) {
     dimmers[dimmer].dimmer = dimmer;
   }
+}
 
-  // attempt to open the serial port
-  int xb = open(xbeeSerialPort,O_RDWR|O_NOCTTY|O_NONBLOCK);
-
+void openFifoWaitForMessagesUntilDaemonKilled() {
   // main loop, open the fifo and wait for messages or for interrupt
   unlink(flasherPipe);
   char buf[CMD_BUF];
   int fifo_create_success = mkfifo(flasherPipe,0777);
   if (fifo_create_success == 0 || errno == EEXIST) {
+
     daemonLog("Waiting for messages on %s...\n",flasherPipe);
     FILE * flasherfile = fopen(flasherPipe,"r");
     if (flasherfile) {
@@ -455,46 +594,11 @@ int main(int argc,char **argv)
           dumpStatsFile();
         }
 
-        // and read serial port for incoming messages
-        static int serialBufferPosition = 0;
-        static char serialBuffer[xbeeSerialBufferLength];
-        int readb = read(xb,serialBuffer+serialBufferPosition,1);
-        if (readb > 0) {
-          // byte available, process like we would with the Arduino code
-          if (serialBufferPosition == xbeeSerialBufferLength - 1) {
-            // message is complete
-            serialBuffer[xbeeSerialBufferLength-1] = 0;
-            daemonLog("Received message from serial port - %s\n",serialBuffer);
-            // interpret the serial command
-            int dimmerNumber,newDimmerValue;
-            if (readDimmerMessage(serialBuffer,&dimmerNumber,&newDimmerValue)) {
-              updateDimmerStatus(dimmerNumber,newDimmerValue);
-            }
-            serialBufferPosition = 0;
-          } else if (serialBufferPosition||serialBuffer[0] == 'D') {
-            // we are already loading a message, move the pointer along
-            // or we have found the start of a relevant message
-            serialBufferPosition++;
-          }
-        } else (readb == -1 && errno != EAGAIN && errno != EINTR) {
-          // not EOF, this must be an error
-          // also it is not EAGAIN or EINTR, which would just mean
-          // there was no bytes available or a signal interrupted the read system call
-          daemonLog("Error reading from the serial port - %s\n",strerror(errno));
-        }
-
-        /* *** TEST CODE *** */
-        //updateDimmerStatus(1,50); // SUM TEST STUF
-
         usleep(dutyCycle); // reduce CPU load
       }
 
       if (fclose(flasherfile)) {
         daemonLog("%s failed to close fifo\n",strerror(errno));
-      }
-
-      if (unlink(statsFilePath)) {
-        daemonLog("%s failed to cleanup stats\n",strerror(errno));
       }
     } else {
       daemonLog("%s failed to open fifo\n",strerror(errno));
@@ -506,12 +610,15 @@ int main(int argc,char **argv)
   } else {
     daemonLog("%s failed to create fifo\n",strerror(errno));
   }
+}
 
-  close(xb);
+void cleanupStatsFile() {
+  if (unlink(statsFilePath)) {
+    daemonLog("%s failed to cleanup stats\n",strerror(errno));
+  }
+}
 
-  // either we couldn't open the fifo or we opened it, ran for a bit and received a shutdown...
-  daemonLog("preparing to shut down...\n");
-  
+void cleanupPwmThreads() {
   // try to clean up all threads
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
     if (pins[pin].thread) {
@@ -519,8 +626,136 @@ int main(int argc,char **argv)
       daemonLog("thread %d done\n",pin);
     }
   }
+}
 
+void showHelp(char * executableFilename) {
+  char *rootFilename = basename(executableFilename);
+  printf("\n%s runs as a daemon\n",rootFilename);
+
+  printf("-s <port>    : open serial port for communication with dimmers\n");
+  printf("-f <fifo>    : control fifo path, otherwise defaults to /tmp/flasher\n");
+  printf("-d <dbgfile> : stats/debug file while running, otherwise defaults to /tmp/flasher.stats\n");
+  printf("-l <logfile> : log file, otherwise defaults to /tmp/flasher.log\n");
+  printf("-w <workingDirectory> : otherwise defaults to /tmp\n");
+  printf("-r <dimmerStatusRoot> : the root for dimmer status fifo files, otherwise defaults /tmp/dimmer\n");
+
+  
+  printf("\n\n");
+  printf("To control a running daemon: echo (p|s|f):XX:YYY > <control fifo>\n");
+  printf("s - steady LED brightness, f - flashing LED, p - power on/off (for relays)\n");
+  printf("XX - pin number 0-%d\n",NUM_PINS);
+  printf("YYY - brightness (0-255), flash period in 10ths of a second (1-999) or 1/0 if simple power control\n");
+  printf("SIGHUP, SIGINT or SIGTERM to cleanly shut down the daemon\n");
+  printf("\n---\n");
+  printf("For dimmer control, send commands to the control fifo, like 1:99, to set brightness of dimmer 1 to 99.\n");
+  printf("Or 1:_ to turn off, 1:O to turn back on and 1:? to update/query brightness.\n");
+  printf("The fifos in /tmp/dimmerx will report the current brightness of dimmer x.\n\n");
+}
+
+void interpretCommandLineParameters(int argc,char **argv) {
+  // command line params
+  // -s <port>    : open serial port for communication with dimmers
+  // -f <fifo>    : control fifo path, otherwise defaults to /tmp/flasher
+  // -d <dbgfile> : stats/debug file while running, otherwise defaults to /tmp/flasher.stats
+  // -l <logfile> : log file, otherwise defaults to /tmp/flasher.log
+  // -w <workingDirectory> : otherwise defaults to /tmp
+  // -r <dimmerStatusRoot> : the root for dimmer status fifo files, otherwise defaults /tmp/dimmer
+
+  bool help = false;
+  for (int i=0;i<argc;i++) {
+    if (strcmp("-s",argv[i])==0) {
+      if (++i<argc) {
+        xbeeSerialPort = argv[i];
+      } else help = true;
+    } else if (strcmp("-f",argv[i])==0) {
+      if (++i<argc) {
+        flasherPipe = argv[i];
+      } else help = true;
+    } else if (strcmp("-d",argv[i])==0) {
+      if (++i<argc) {
+        statsFilePath = argv[i];
+      } else help = true;
+    } else if (strcmp("-l",argv[i])==0) {
+      if (++i<argc) {
+        flasherLog = argv[i];
+      } else help = true;
+    } else if (strcmp("-w",argv[i])==0) {
+      if (++i<argc) {
+        flasherPwd = argv[i];
+      } else help = true;
+    } else if (strcmp("-r",argv[i])==0) {
+      if (++i<argc) {
+        dimmerStatusRoot = argv[i];
+        // test max length etc. for edge cases
+        const int dimmerStatusRootMaxLength = 255;
+        int dimmerStatusRootLength = strnlen(dimmerStatusRoot,dimmerStatusRootMaxLength);
+        if (dimmerStatusRootLength==dimmerStatusRootMaxLength) {
+          printf("WARNING ** dimmer status root was too long, truncating to 255 characters!\n");
+          dimmerStatusRoot[dimmerStatusRootLength] = 0;
+        }
+      } else help = true;
+    }
+  }
+
+  showHelp(argv[0]);
+  exit(EXIT_SUCCESS);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+//*** MAIN FUNCTION ***//
+
+// the main control function
+// print help, if needed, setup signal handling for clean daemon exit, setup GPIO
+// daemonize, setup fifo and wait for instructions
+int main(int argc,char **argv)
+{
+  // emit help and exit cleanly if they specify any parameters
+  if (argc>1) {
+    interpretCommandLineParameters(argc,argv);
+  }
+
+  setupSignalHandling();
+  becomeDaemon();
+
+
+
+  // setup
+
+  SETUP_GPIO();
+  initialisePwmPinsState();
+  initialiseDimmerControlState();
+  startSerialReadThread();
+
+
+
+
+  // loop
+
+  /* *** TEST CODE *** */
+  updateDimmerStatus(1,50); // SUM TEST STUF
+  openFifoWaitForMessagesUntilDaemonKilled();
+
+
+
+
+  // shutdown
+
+  // either we couldn't open the fifo or we opened it, ran for a bit and received a shutdown...
+  daemonLog("preparing to shut down...\n");
+  cleanupStatsFile();
+  cleanupPwmThreads();
   closeDimmerStatusThreads();
 
-  return 0; 
+  return EXIT_SUCCESS; 
 }
