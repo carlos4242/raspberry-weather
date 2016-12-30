@@ -1,5 +1,6 @@
 .DS_Store
 flasher.log
+flasher.status
 flasher
 dimmer*
 *.json

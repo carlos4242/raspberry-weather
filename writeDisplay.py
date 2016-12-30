@@ -55,14 +55,14 @@ left = padding
 right = width-padding
 
 def printTextString(x,y,text):
-    for i, c in enumerate(text):
-        # Stop drawing if off the right side of screen.
-        if x > width:
-            break
-        draw.text((x, y), c, font=font, fill=255)
-        # Increment x position based on chacacter width.
-        char_width, char_height = draw.textsize(c, font=font)
-        x += char_width
+  for i, c in enumerate(text):
+    # Stop drawing if off the right side of screen.
+    if x > width:
+      break
+    draw.text((x, y), c, font=font, fill=255)
+    # Increment x position based on chacacter width.
+    char_width, char_height = draw.textsize(c, font=font)
+    x += char_width
 
 hours = 24
 tempRange = 25

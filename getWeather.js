@@ -3,16 +3,29 @@
 // poll the weather service
 // look for sunshine, clouds, rain, alerts, night and day
 
+// paths, etc.
+const darkSkyServer = "https://api.forecast.io";
+const darkSkyAPIPath = "/forecast";
+const weatherSummaryFile = "weather.txt";
+const configFile = "./config.json";
+const gpioPipe = "flasher";
+const oledDisplayTextFile = 'disp.json';
+const oledTempsArrayFile = 'temp.json';
+const testModeFullWeatherDumpFile = 'weather.json';
+
+var writeOLEDDisplayScript = __dirname + "/writeDisplay.py";
+
 var http = require('https');
 var fs = require('fs');
 var util = require('util');
 
 var flags = process.argv[2];
-var config = require('./config.json')
-var units = (config.units == undefined) ? 'auto' : config.units;
+var config = require(configFile);
+var units = "units="+((config.units == undefined) ? 'auto' : config.units);
 var excludes = (flags == 'full') ? '' : '&exclude=minutely,flags';
-var weatherUrl = "https://api.forecast.io/forecast/"+
-config.key+"/"+config.latitude+","+config.longitude+"?units="+units+excludes;
+var key = config.key;
+var latLong = config.latitude+","+config.longitude;
+var weatherUrl = darkSkyServer+darkSkyAPIPath+"/"+key+"/"+latLong+"?"+units+excludes;
 var finished = false;
 var data = "";
 var waitedCount = 0;
@@ -23,7 +36,6 @@ var redPin = 5;
 var whitePin = 17;
 var bluePin = 19;
 
-const outputFilename = "weather.txt";
 const secondsInAnHour = 3600;
 const secondsInADay = secondsInAnHour*24;
 
@@ -60,67 +72,72 @@ function waitToFinish() {
 // if [ -p /tmp/flasher ] ... if we were in a shell but we aren't
 
 function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp,pi) {
-	var writableStream = fs.createWriteStream('/tmp/flasher');
-	if (snow) {
-		writableStream.write('s:'+whitePin+':150\n');
-	} else if (hail) {
-		writableStream.write('f:'+whitePin+':005\n');
-	} else {
-		writableStream.write('s:'+whitePin+':000\n');
-	}
+	fs.exists(gpioPipe, function(exists) {
+		if (exists) {
+			var writableStream = fs.createWriteStream(gpioPipe);
+			if (snow) {
+				writableStream.write('s:'+whitePin+':150\n');
+			} else if (hail) {
+				writableStream.write('f:'+whitePin+':005\n');
+			} else {
+				writableStream.write('s:'+whitePin+':000\n');
+			}
 
-	if (frost) {
-		writableStream.write('s:'+bluePin+':020\n');
-	} else if (chill) {
-		writableStream.write('s:'+bluePin+':003\n');
-	} else {
-		writableStream.write('s:'+bluePin+':000\n');
-	}
+			if (frost) {
+				writableStream.write('s:'+bluePin+':020\n');
+			} else if (chill) {
+				writableStream.write('s:'+bluePin+':003\n');
+			} else {
+				writableStream.write('s:'+bluePin+':000\n');
+			}
 
-	if (cloudy) {
-		writableStream.write('s:'+greenPin+':255\n');
-	} else {
-		writableStream.write('s:'+greenPin+':000\n');
-	}
-	
-	if (sunny) {
-		var ss = (0.7 - cloudCover);
-		if (ss < 0) {
-			ss = 0;
-		} else if (ss > 0.7) {
-			ss = 0.7;
+			if (cloudy) {
+				writableStream.write('s:'+greenPin+':255\n');
+			} else {
+				writableStream.write('s:'+greenPin+':000\n');
+			}
+			
+			if (sunny) {
+				var ss = (0.7 - cloudCover);
+				if (ss < 0) {
+					ss = 0;
+				} else if (ss > 0.7) {
+					ss = 0.7;
+				}
+				var suni = (ss / 0.7) * 255;
+				writableStream.write('s:'+yellowPin+':'+suni+'\n');
+			} else {
+				writableStream.write('s:'+yellowPin+':000\n');
+			}
+
+			if (alert) {
+				writableStream.write('f:'+redPin+':004\n');
+			} else if (rain) {
+				var ps = pi * 10;
+				if (ps < 0) {
+					ps = 0;
+				} else if (ps > 1) {
+					ps = 1;
+				}
+				var raini = ps * 255 * pp;
+				writableStream.write('s:'+redPin+':'+raini+'\n');
+			} else {
+				writableStream.write('s:'+redPin+':000\n');
+			}
+			writableStream.end();
+		} else {
+			console.log("Cannot access gpio fifo : "+gpioPipe);
 		}
-		var suni = (ss / 0.7) * 255;
-		writableStream.write('s:'+yellowPin+':'+suni+'\n');
-	} else {
-		writableStream.write('s:'+yellowPin+':000\n');
-	}
-
-	if (alert) {
-		writableStream.write('f:'+redPin+':004\n');
-	} else if (rain) {
-		var ps = pi * 10;
-		if (ps < 0) {
-			ps = 0;
-		} else if (ps > 1) {
-			ps = 1;
-		}
-		var raini = ps * 255 * pp;
-		writableStream.write('s:'+redPin+':'+raini+'\n');
-	} else {
-		writableStream.write('s:'+redPin+':000\n');
-	}
-	writableStream.end();
+	});
 }
 
 
 function printDisplayMessage(env) {
-	var scriptFile = __dirname + "/writeDisplay.py";
 	var exec = require('child_process').exec;
 	var options = {};
 	options["cwd"] = __dirname;
 	options["env"] = env;
-	exec(scriptFile, options, function(error, stdout, stderr) {
+	exec(writeOLEDDisplayScript, options, function(error, stdout, stderr) {
 	  if (error) {
 	    console.error('exec error: '+error);
 	    return;
@@ -170,13 +187,13 @@ function describeTemperature(
 		env["PP"] = (pp*100)+"%";
 		env["P"] = pt;
 	}
-	fs.writeFile('disp.json',JSON.stringify(env),function(err){
+	fs.writeFile(oledDisplayTextFile,JSON.stringify(env),function(err){
 		if (err) {
-			console.log('could not write disp.json');
+			console.log('could not write OLED text info file : '+oledDisplayTextFile);
 		} else {
-			fs.writeFile('temp.json',JSON.stringify(daylightHours),function(err){
+			fs.writeFile(oledTempsArrayFile,JSON.stringify(daylightHours),function(err){
 				if (err) {
-					console.log('coult not write temp.json');
+					console.log('coult not write OLED temps array file : '+oledTempsArrayFile);
 				} else {
 					printDisplayMessage({});
 				}
@@ -227,13 +244,16 @@ function finish() {
 	var daytime = now > sunrise && now < sunset;
 	var moon = (sunny && daytime);
 
+	// write the discovered weather to the LEDs first
 	writeLights(cloudy,sunny,rain||sleet,alert,snow,hail,frost,chill,cloudCover,pp,pi);
 
+  // then update the OLED display
 	describeTemperature(
 		maxTemp,maxTempTime,
 		sunrise,sunset,
 		pp,pi,pt,hours);
 
+	// finally, write out a summary weather file for the website
 	var output = {
 		cloudy:cloudy,
 		sunny:sunny,
@@ -258,19 +278,21 @@ function finish() {
 		minTemp:minTemp,
 		apparentMin:apparentMin
 	}
-	fs.writeFile(outputFilename,JSON.stringify(output, null, 2));
+
+	fs.writeFile(weatherSummaryFile,JSON.stringify(output, null, 2));
 	
+	// lastly, output the full weather details if requested
 	if (flags == 'today') {
 		console.log(JSON.stringify(today, null, 2));	
 	} else if (flags == 'daily' || flags == 'full') {
 		console.log(JSON.stringify(weather, null, 2));
 	} else if (flags != 'test') {
-		fs.writeFile('weather.json',data);
+		fs.writeFile(testModeFullWeatherDumpFile,data);
 	}
 }
 
 if (flags == 'test') {
-	fs.readFile('weather.json',function(err,fileContents) {
+	fs.readFile(testModeFullWeatherDumpFile,function(err,fileContents) {
 		if (err) {
 			console.log('failed to load weather.json : '+err);
 		} else {
