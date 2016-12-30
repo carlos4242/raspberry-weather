@@ -520,14 +520,38 @@ void startSerialReadThread() {
   }
 }
 
+void printCwd() {
+  char pwdBuf[PATH_MAX];
+  if (!getcwd(pwdBuf,PATH_MAX)) {
+    perror("cannot get cwd");
+  } else {
+    printf("CWD = %s",pwdBuf);
+  }
+}
+
+// (from http://www.netzmafia.de/skripten/unix/linux-daemon-howto.html)
 void becomeDaemon() {
+
+  // Chdir if required... we cannot daemonize safely without this
   if (flasherPwd&&(chdir(flasherPwd)) < 0) {
     daemonLog("%s failed to chdir\n",strerror(errno));
     exit(EXIT_FAILURE);
   }
-  // now the initial setup is done, attempt to make ourselves a daemon before continuing
-  // all logging from now on goes to a dedicated log file
-  // (from http://www.netzmafia.de/skripten/unix/linux-daemon-howto.html)
+
+  umask(0);
+
+  // create the log file... note, we exit fail without creating a daemon
+  // if this fails, otherwise it's hard to trace what happened easily
+  debugFile = fopen(flasherLog, "w+");
+  if (debugFile) {
+    daemonLog("created log file\n");
+  } else {
+    printf("Failed to create debug log file (%s) - %s\n",flasherLog,strerror(errno));
+    printCwd();
+    exit(EXIT_FAILURE);
+  }
+
+  // logfile created, umask set, chdir done... it's safe to daemonize
   pid_t pid, sid;
   pid = fork();
   if (pid < 0) {
@@ -537,13 +561,10 @@ void becomeDaemon() {
   if (pid > 0) {
     exit(EXIT_SUCCESS);
   }
-  umask(0);
-  debugFile = fopen(flasherLog, "w+");
-  if (!debugFile) {
-    perror("failed to create debug log file");
-  } else {
-    daemonLog("created log file\n");
-  }
+
+  // a daemon should be in its own process group with no
+  // stdin, stdout, stderr... those functions are served
+  // by more appropriate interfaces like logfiles and FIFOs
   sid = setsid();
   if (sid < 0) {
     daemonLog("%s failed to setsid\n",strerror(errno));
@@ -552,6 +573,7 @@ void becomeDaemon() {
   close(STDIN_FILENO);  // this is enough to stop the daemon from working
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
+
   // we are now a daemon, logging to file
   daemonLog("daemon running (%d)\n",getpid());
 }
