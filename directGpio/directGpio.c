@@ -50,7 +50,6 @@
 #define MIN_PIN 1 // for now, pin 0 is invalid, fix this later if needed
 #define MIN_DIMMER 1
 #define dimmerStatusMaxExtensionLength 2
-#define SERIAL_OUT_BUFSIZE 8
 
 // PWM
 #define maxBrightness 255.0
@@ -102,10 +101,6 @@ typedef struct {
   int requestedBrightness;
 } dmr_t;
 dmr_t dimmers[NUM_DIMMERS] = {0};
-
-
-char serialOutBuffer[SERIAL_OUT_BUFSIZE];
-
 
 // handle graceful shutdown
 bool keepRunning = true;
@@ -413,14 +408,30 @@ void doControlMessage(char * message) {
       if (dimmerMsg) {
         // send message to dimmer
         if (pin >= MIN_DIMMER && pin <= NUM_DIMMERS) {
-          dimmers[pin].requestedBrightness = newParameter;
-	  if (openedSerialPort) {
-	    static char serialOutBuffer[SERIAL_OUT_BUFSIZE];
-	    sprintf(serialOutBuffer,"DMR%d:%02d\n",pin,newParameter);
-	    if (write(openedSerialPort,serialOutBuffer,SERIAL_OUT_BUFSIZE)<0) {
-	      daemonLog("Problem writing to serial port (%d) - (%s)",errno,strerror(errno));
-	    }
-	  } 
+          bool specialMessage = message[0]=='_'||message[0]=='O'||message[0]=='?';
+          if (!specialMessage) {
+            dimmers[pin].requestedBrightness = newParameter;
+          }
+      	  if (openedSerialPort) {
+            #define SERIAL_OUT_BUFSIZE 8
+      	    static char serialOutBuffer[SERIAL_OUT_BUFSIZE];
+            int bufLen = SERIAL_OUT_BUFSIZE;
+            if (specialMessage) {
+              sprintf(serialOutBuffer,"DMR%d:%c\n",pin,message[0]);
+              bufLen = 7;
+            } else {
+              if (newParameter>90) {
+                newParameter = 90;
+              } else if (newParameter<5) {
+                newParameter = 5;
+              }
+              sprintf(serialOutBuffer,"DMR%d:%02d\n",pin,newParameter);
+              bufLen = 8;
+            }
+      	    if (write(openedSerialPort,serialOutBuffer,bufLen>SERIAL_OUT_BUFSIZE?SERIAL_OUT_BUFSIZE:bufLen)<0) {
+      	      daemonLog("Problem writing to serial port (%d) - (%s)",errno,strerror(errno));
+      	    }
+      	  } 
         }
       } else {
         daemonLog("adjusting pin %d\n",pin);
@@ -825,3 +836,6 @@ int main(int argc,char **argv)
 
   return EXIT_SUCCESS; 
 }
+
+
+                                                       

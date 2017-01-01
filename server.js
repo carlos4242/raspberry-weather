@@ -4,37 +4,12 @@ var port = process.env.PORT || 80;
 var server = require('http').createServer(app);
 var bodyParser = require('body-parser');
 var fs = require('fs');
-var readStream = fs.createReadStream('/dev/ttyACM0');
 var currentBrightness = 'unknown';
 var savedBrightness = 0;
 
-readStream
-	.on('error', function(err) {
-		console.log('stream error : '+err);
-	})
-	.on('data', function(data) {
-		if ((""+data).substring(0,5) == 'DMR1=') {
-			var dimmerNumberString = (""+data).substring(5,10).trim();
-			if (dimmerNumberString=="_") {
-				console.log("detected that light is off");
-				currentBrightness = "off";
-			} else {
-				var dimmerValue = Number(dimmerNumberString);
-				console.log("brightness read as : "+dimmerValue);
-				currentBrightness = dimmerValue;
-			}
-			savedBrightness = currentBrightness;
-		}
-	})
-	.on('open', function (fdread) {
-	  // This just pipes the read stream to the response object (which goes to the client)
-	  console.log('opened read stream');
-	  setTimeout(queryBrightness,300); // get initial brightness
-	});
-
 function sendCommand(cmd) {
 	// send the command request to the arduino
-	fs.open('/dev/ttyACM0', 'w', function(err, fdwrite) {
+	fs.open('flasher', 'w', function(err, fdwrite) {
 		if (err) {
 			console.log("error opening usb port for writing : "+err);
 		} else {
@@ -50,16 +25,26 @@ function sendCommand(cmd) {
 }
 
 function queryBrightness() {
-	sendCommand("DMR1:?");
+	var dimmerNumberString = fs.readFileSync('dimmer1');
+	if (dimmerNumberString=="_") {
+		console.log("detected that light is off");
+		currentBrightness = "off";
+	} else {
+		var dimmerValue = Number(dimmerNumberString);
+		console.log("brightness read as : "+dimmerValue);
+		currentBrightness = dimmerValue;
+	}
+	savedBrightness = currentBrightness;
+	sendCommand("d:1:?");
 }
 
 function powerOff() {
-	sendCommand("DMR1:_");
+	sendCommand("d:1:_");
 	currentBrightness = 'off';
 }
 
 function powerOn() {
-	sendCommand("DMR1:O");
+	sendCommand("d:1:O");
 	currentBrightness = savedBrightness;
 }
 
@@ -72,10 +57,10 @@ function powerLevel(level) {
 	}
 	currentBrightness = level;
 	savedBrightness = level;
-	sendCommand("DMR1:"+level);
+	sendCommand("d:1:"+(("0"+level).slice(-3)));
 }
 
-
+console.log('attempting to start http server...');
 server.listen(port, function () {
   console.log('Server listening at port %d on IP addresses...', port);
 });
@@ -130,7 +115,7 @@ app.get('/light', function(req,res) {
 });
 
 app.get('/weather.txt',function(req,res) {
-	fs.readFile('/home/carlpeto/node/weather.txt', function(error, content) {
+	fs.readFile('weather.txt', function(error, content) {
 		if (error) {
 			res.status(500).end();
 		}
