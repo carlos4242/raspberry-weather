@@ -1,4 +1,5 @@
 .DS_Store
+forever
 flasher.log
 flasher.status
 flasher

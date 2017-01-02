@@ -1,3 +1,8 @@
+// paths
+const gpioWriteableFifoPipeFile = '../flasher';
+const dimmerReadableFifoPipeFile = '../dimmer1';
+const weatherSummaryFile = '../weather.txt';
+
 var express = require('express');
 var app = express();
 var port = process.env.PORT || 80;
@@ -8,24 +13,13 @@ var currentBrightness = 'unknown';
 var savedBrightness = 0;
 
 function sendCommand(cmd) {
-	// send the command request to the arduino
-	fs.open('flasher', 'w', function(err, fdwrite) {
-		if (err) {
-			console.log("error opening usb port for writing : "+err);
-		} else {
-			var bytes = fs.writeSync(fdwrite,cmd);
-			if (bytes) {
-				console.log("wrote "+cmd);
-			} else {
-				console.log("error writing to usb port");
-			}
-			fs.close(fdwrite);
-		}
-	});
+	// send the command request to the arduino (via the gpio daemon)
+	fs.writeFileSync(gpioWriteableFifoPipeFile,cmd,{flag:'a'});
 }
 
 function queryBrightness() {
-	var dimmerNumberString = fs.readFileSync('dimmer1');
+	sendCommand("d:1:?");
+	var dimmerNumberString = fs.readFileSync(dimmerReadableFifoPipeFile);
 	if (dimmerNumberString=="_") {
 		console.log("detected that light is off");
 		currentBrightness = "off";
@@ -35,7 +29,6 @@ function queryBrightness() {
 		currentBrightness = dimmerValue;
 	}
 	savedBrightness = currentBrightness;
-	sendCommand("d:1:?");
 }
 
 function powerOff() {
@@ -115,7 +108,7 @@ app.get('/light', function(req,res) {
 });
 
 app.get('/weather.txt',function(req,res) {
-	fs.readFile('weather.txt', function(error, content) {
+	fs.readFile(weatherSummaryFile, function(error, content) {
 		if (error) {
 			res.status(500).end();
 		}
@@ -125,4 +118,3 @@ app.get('/weather.txt',function(req,res) {
 		}
 	})
 });
-
