@@ -390,48 +390,86 @@ Setup/cleanup routines (including signal handling).
 // Note: do not use LED control signals (s: or f:) to control a relay.
 // It will send a PWM signal that will probably not activate the relay cleanly and may damage it.
 
+// control message structure must now be strict, we've had too many problems
+// x:00:000\n
+// 012345678
+
+// __ ... first part must match s: or f: or p: or d:
+// after that detection and message+=2
+// 00:000\n
+// 0123456
+// 00:000\0
+// __ ... next part must be two digits
+
+bool isValid(char * message) {
+  // this checks that the remainder of a message conforms to 00:000\0
+  // or 00:X\0
+  // where X is a valid controlling character, e.g. ? or _ or O
+  if (strnlen(message,6)<4) return false;
+  if (message[0]<'0'||message[0]>'9') return false;
+  if (message[1]<'0'||message[1]>'9') return false;
+  if (message[2]!=':') return false;
+}
+
 void doControlMessage(char * message) {
+  daemonLog("received control message %s\n",message);
   bool steadyMsg=strncmp(message,"s:",2)==0;
   bool flashMsg=strncmp(message,"f:",2)==0;
   bool relayControlMsg=strncmp(message,"p:",2)==0;
   bool dimmerMsg=strncmp(message,"d:",2)==0;
   if (steadyMsg||flashMsg||relayControlMsg||dimmerMsg) { 
-    daemonLog("received control message %s\n",message);
     message+=2;
     message[6]=0;
-    if (strnlen(message,6)<=6&&strnlen(message,6)>=4) {
-      char pinBuf[3]={0};
-      strncpy(pinBuf,message,2);
-      unsigned char pin = atoi(pinBuf);
+    daemonLog("... message (%d) %s\n",strnlen(message,6),message);
+    if (isValid(message)) { // make sure the message must conform to 00:X ... where 00 is digis only and X is digits or a letter
+      char pinBuf[3]={0};// initialise a string buffer with 0
+      strncpy(pinBuf,message,2); // copy two bytes so the third is automatically the string terminator
+      unsigned char pin = atoi(pinBuf); // interpret that string as an integer
       message+=3;
       unsigned char newParameter = atoi(message);
       if (dimmerMsg) {
         // send message to dimmer
-        if (pin >= MIN_DIMMER && pin <= NUM_DIMMERS) {
-          bool specialMessage = message[0]=='_'||message[0]=='O'||message[0]=='?';
-          if (!specialMessage) {
+        if (pin >= MIN_DIMMER && pin <= NUM_DIMMERS && openedSerialPort) {
+          daemonLog("interpreting dimmer message %s\n",message);
+          daemonLog("char 1 is %c",message[0]);
+
+          bool turnOff = message[0]=='_';
+          bool turnOn = message[0]=='O';
+          bool query = message[0]=='?';
+          bool powerLevelMsg = !turnOn&&!turnOff&&!query;
+
+          if (powerLevelMsg) {
             dimmers[pin].requestedBrightness = newParameter;
           }
-      	  if (openedSerialPort) {
-            #define SERIAL_OUT_BUFSIZE 8
-      	    static char serialOutBuffer[SERIAL_OUT_BUFSIZE];
-            int bufLen = SERIAL_OUT_BUFSIZE;
-            if (specialMessage) {
-              sprintf(serialOutBuffer,"DMR%d:%c\n",pin,message[0]);
-              bufLen = 7;
-            } else {
-              if (newParameter>90) {
-                newParameter = 90;
-              } else if (newParameter<5) {
-                newParameter = 5;
-              }
-              sprintf(serialOutBuffer,"DMR%d:%02d\n",pin,newParameter);
-              bufLen = 8;
+
+          #define SERIAL_OUT_BUFSIZE 8
+
+    	    static char serialOutBuffer[SERIAL_OUT_BUFSIZE];
+
+          bzero(serialOutBuffer,SERIAL_OUT_BUFSIZE);
+
+          if (query) {
+            sprintf(serialOutBuffer,"DMR%d:??\n",pin);
+          } else if (turnOff) {
+            sprintf(serialOutBuffer,"DMR%d:__\n",pin);
+          } else if (turnOn) {
+            sprintf(serialOutBuffer,"DMR%d:OO\n",pin);
+          } else {
+            if (newParameter>90) {
+              newParameter = 90;
+            } else if (newParameter<5) {
+              newParameter = 5;
             }
-      	    if (write(openedSerialPort,serialOutBuffer,bufLen>SERIAL_OUT_BUFSIZE?SERIAL_OUT_BUFSIZE:bufLen)<0) {
-      	      daemonLog("Problem writing to serial port (%d) - (%s)",errno,strerror(errno));
-      	    }
-      	  } 
+            sprintf(serialOutBuffer,"DMR%d:%02d\n",pin,newParameter);
+          }
+
+          daemonLog("writing to serial port : %s\n",serialOutBuffer);
+
+    	    if (write(openedSerialPort,serialOutBuffer,SERIAL_OUT_BUFSIZE)<0) {
+    	      daemonLog("Problem writing to serial port (%d) - (%s)",errno,strerror(errno));
+    	    }
+        } else if (openedSerialPort) {
+          daemonLog("pin %d is an invalid pin\n",pin);
         }
       } else {
         daemonLog("adjusting pin %d\n",pin);
@@ -453,6 +491,7 @@ void doControlMessage(char * message) {
             pins[pin].brightness=0;
             daemonLog("parameter is %s, interpreted as power on %d\n",message,pins[pin].powerOn);
           }
+          
           if (!pins[pin].thread) {
             int pin_thread_success = pthread_create(&pins[pin].thread, NULL, flasher, (void*)&pins[pin]);
             assert(0 == pin_thread_success);
@@ -463,7 +502,7 @@ void doControlMessage(char * message) {
         }
       }
     } else {
-      daemonLog("invalid length control message - should be _:XX:YYY was %d - %s\n",strnlen(message,6),message);
+      daemonLog("invalid control message - should be XX:Y or XX:YY or XX:YYY (XX=pin,Y[Y[Y]]=action) was %s\n",message);
     }
   }
 }
@@ -836,6 +875,3 @@ int main(int argc,char **argv)
 
   return EXIT_SUCCESS; 
 }
-
-
-                                                       

@@ -18,26 +18,26 @@ function sendCommand(cmd) {
 }
 
 function queryBrightness() {
-	sendCommand("d:1:?");
+	sendCommand("d:01:?");
 	var dimmerNumberString = fs.readFileSync(dimmerReadableFifoPipeFile);
-	if (dimmerNumberString=="_") {
-		console.log("detected that light is off");
-		currentBrightness = "off";
-	} else {
-		var dimmerValue = Number(dimmerNumberString);
-		console.log("brightness read as : "+dimmerValue);
-		currentBrightness = dimmerValue;
-	}
+	// if (dimmerNumberString=="-1") {
+	// 	console.log("detected that light is off");
+	// 	currentBrightness = "off";
+	// } else {
+	var dimmerValue = Number(dimmerNumberString);
+	console.log("brightness read as : "+dimmerValue);
+	currentBrightness = dimmerValue;
+	// }
 	savedBrightness = currentBrightness;
 }
 
 function powerOff() {
-	sendCommand("d:1:_");
+	sendCommand("d:01:_");
 	currentBrightness = 'off';
 }
 
 function powerOn() {
-	sendCommand("d:1:O");
+	sendCommand("d:01:O");
 	currentBrightness = savedBrightness;
 }
 
@@ -50,7 +50,7 @@ function powerLevel(level) {
 	}
 	currentBrightness = level;
 	savedBrightness = level;
-	sendCommand("d:1:"+(("0"+level).slice(-3)));
+	sendCommand("d:01:"+(("0"+level).slice(-3)));
 }
 
 console.log('attempting to start http server...');
@@ -89,19 +89,15 @@ app.get('/', function(req, res) {
 app.get('/light', function(req,res) {
 	if (req.query.power == 'on') {
 		powerOn();
-		queryBrightness();
 		res.end();
 	} else if (req.query.power == 'off') {
 		powerOff();
-		queryBrightness();
 		res.end();
 	} else if (req.query.powerLevel != undefined) {
 		powerLevel(req.query.powerLevel);
 		res.end();
-	} else if (req.query.check == 1) {
-		queryBrightness();
-		res.end();
 	} else {
+		queryBrightness();
 		res.writeHead(200, { 'Content-Type': 'application/json' });
 		res.end(JSON.stringify({"light":currentBrightness}));
 	}

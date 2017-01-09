@@ -30,9 +30,9 @@ var finished = false;
 var data = "";
 var waitedCount = 0;
 
-var yellowPin = 4;
+var yellowPin = "04";
 var greenPin = 22;
-var redPin = 5;
+var redPin = "05";
 var whitePin = 17;
 var bluePin = 19;
 
@@ -104,7 +104,7 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 				} else if (ss > 0.7) {
 					ss = 0.7;
 				}
-				var suni = (ss / 0.7) * 255;
+				var suni = Math.round((ss / 0.7) * 255);
 				writableStream.write('s:'+yellowPin+':'+suni+'\n');
 			} else {
 				writableStream.write('s:'+yellowPin+':000\n');
@@ -119,7 +119,7 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 				} else if (ps > 1) {
 					ps = 1;
 				}
-				var raini = ps * 255 * pp;
+				var raini = Math.round(ps * 255 * pp);
 				writableStream.write('s:'+redPin+':'+raini+'\n');
 			} else {
 				writableStream.write('s:'+redPin+':000\n');
@@ -184,7 +184,7 @@ function describeTemperature(
 	env["SUNRISE"] = ""+timeFromUnixTime(sunrise);
 	env["SUNSET"] = ""+timeFromUnixTime(sunset);
 	if (pp>0.1) {
-		env["PP"] = (pp*100)+"%";
+		env["PP"] = Math.round(pp*100)+"%";
 		env["P"] = pt;
 	}
 	fs.writeFile(oledDisplayTextFile,JSON.stringify(env),function(err){
