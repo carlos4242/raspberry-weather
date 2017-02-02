@@ -79,11 +79,10 @@ app.use('/res',express.static(__dirname + '/res'));
 // any number below 0 will be read as 0 and any number above 138 will be read as 138
 
 app.get('/', function(req, res) {
+console.log('serving site');
 	queryBrightness();
-	setTimeout(function(){
-		res.render('index',{lampBrightness:currentBrightness});
-	  res.end();
-	},1500);
+	res.render('index',{lampBrightness:currentBrightness});
+	res.end();
 });
 
 app.get('/light', function(req,res) {

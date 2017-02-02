@@ -276,7 +276,8 @@ function finish() {
 		sunrise:sunrise,
 		sunset:sunset,
 		minTemp:minTemp,
-		apparentMin:apparentMin
+		apparentMin:apparentMin,
+		alerts:alerts
 	}
 
 	fs.writeFile(weatherSummaryFile,JSON.stringify(output, null, 2));
