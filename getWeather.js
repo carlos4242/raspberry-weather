@@ -266,15 +266,15 @@ function finish() {
 		alert:alert,
 		frost:frost,
 		chill:chill,
-		now:now,
+		now:timeFromUnixTime(now),
 		daytime:daytime,
 		moon:moon,
 		cloudCover:cloudCover,
 		pp:pp,
 		pt:pt,
 		pi:pi,
-		sunrise:sunrise,
-		sunset:sunset,
+		sunrise:timeFromUnixTime(sunrise),
+		sunset:timeFromUnixTime(sunset),
 		minTemp:minTemp,
 		apparentMin:apparentMin
 	}
