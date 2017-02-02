@@ -24,6 +24,7 @@
 
 #endif
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <signal.h>
@@ -409,6 +410,7 @@ bool isValid(char * message) {
   if (message[0]<'0'||message[0]>'9') return false;
   if (message[1]<'0'||message[1]>'9') return false;
   if (message[2]!=':') return false;
+  return true;
 }
 
 void doControlMessage(char * message) {
