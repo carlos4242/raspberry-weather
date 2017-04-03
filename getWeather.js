@@ -165,6 +165,7 @@ function describeTemperature(
 
 	var maxHour = 0;
 	var daylightHours = {};
+	
 	hours.forEach(function (hourData) {
 		var time = hourData.time;
 		var temp = hourData.temperature;
@@ -183,10 +184,12 @@ function describeTemperature(
 	env["HIGH_TEMP_HOUR"] = maxHour;
 	env["SUNRISE"] = ""+timeFromUnixTime(sunrise);
 	env["SUNSET"] = ""+timeFromUnixTime(sunset);
+
 	if (pp>0.1) {
 		env["PP"] = Math.round(pp*100)+"%";
 		env["P"] = pt;
 	}
+
 	fs.writeFile(oledDisplayTextFile,JSON.stringify(env),function(err){
 		if (err) {
 			console.log('could not write OLED text info file : '+oledDisplayTextFile);
