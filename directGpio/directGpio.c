@@ -158,7 +158,7 @@ void dumpStatsFile() {
     fclose(statsFile);
     daemonLog("finished stats file and closed\n");
   } else {
-    perror("failed to create stats file");
+    daemonLog("failed to create stats file\n");
   }
 }
 
@@ -611,6 +611,7 @@ void becomeDaemon() {
     exit(EXIT_FAILURE);
   }
   if (pid > 0) {
+    daemonLog("spawned child pid %d\n",pid);
     exit(EXIT_SUCCESS);
   }
 
@@ -625,6 +626,10 @@ void becomeDaemon() {
   close(STDIN_FILENO);  // this is enough to stop the daemon from working
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
+
+  open("/dev/null", O_RDONLY);
+  open("/dev/null", O_RDWR);
+  open("/dev/null", O_RDWR);
 
   // we are now a daemon, logging to file
   daemonLog("daemon running (%d)\n",getpid());
