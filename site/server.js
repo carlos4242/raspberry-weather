@@ -17,8 +17,12 @@ function sendCommand(cmd) {
 	fs.writeFileSync(gpioWriteableFifoPipeFile,cmd,{flag:'a'});
 }
 
-function queryBrightness() {
-	sendCommand("d:01:?");
+function queryBrightness(light) {
+	if (light==undefined) {
+		light = "01"
+	}
+
+	sendCommand("d:"+light+":?");
 	var dimmerNumberString = fs.readFileSync(dimmerReadableFifoPipeFile);
 	// if (dimmerNumberString=="-1") {
 	// 	console.log("detected that light is off");
@@ -31,26 +35,39 @@ function queryBrightness() {
 	savedBrightness = currentBrightness;
 }
 
-function powerOff() {
-	sendCommand("d:01:_");
+function powerOff(light) {
+	if (light==undefined) {
+		light = "01"
+	}
+	sendCommand("d:"+light+":_");
 	currentBrightness = 'off';
 }
 
-function powerOn() {
-	sendCommand("d:01:O");
+function powerOn(light) {
+	if (light==undefined) {
+		light = "01"
+	}
+	sendCommand("d:"+light+":O");
 	currentBrightness = savedBrightness;
 }
 
-function powerLevel(level) {
+function powerLevel(level,light) {
 	var level = parseInt(level);
+
 	if (level<0) {
 		level = 0;
 	} else if (level>120) {
 		level = 120;
 	}
+
 	currentBrightness = level;
 	savedBrightness = level;
-	sendCommand("d:01:"+(("0"+level).slice(-3)));
+
+	if (light==undefined) {
+		light = "01"
+	}
+
+	sendCommand("d:"+light+":"+(("0"+level).slice(-3)));
 }
 
 console.log('attempting to start http server...');
@@ -87,16 +104,16 @@ console.log('serving site');
 
 app.get('/light', function(req,res) {
 	if (req.query.power == 'on') {
-		powerOn();
+		powerOn(req.query.light);
 		res.end();
 	} else if (req.query.power == 'off') {
-		powerOff();
+		powerOff(req.query.light);
 		res.end();
 	} else if (req.query.powerLevel != undefined) {
-		powerLevel(req.query.powerLevel);
+		powerLevel(req.query.powerLevel,req.query.light);
 		res.end();
 	} else {
-		queryBrightness();
+		queryBrightness(req.query.light);
 		res.writeHead(200, { 'Content-Type': 'application/json' });
 		res.end(JSON.stringify({"light":currentBrightness}));
 	}
