@@ -41,7 +41,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <libgen.h>
-
+#include <termios.h>
 
 #define CMD_BUF 1024
 
@@ -311,6 +311,24 @@ void *serialPortRead(void *pptr) {
   int xb = open(xbeeSerialPort,O_RDWR|O_NOCTTY|O_NONBLOCK);
   if (xb==-1) {
     daemonLog("Failed to open serial port %s - %s (%d)\n",xbeeSerialPort,strerror(errno),errno);
+    return NULL;
+  }
+
+  struct termios tty;
+  if(tcgetattr(xb, &tty)==-1) {
+    daemonLog("Error getting serial port attributes %s - %s (%d)\n",xbeeSerialPort,strerror(errno),errno);
+    return NULL;
+  }
+
+  cfmakeraw(&tty);
+  tty.c_cflag = B9600|CS8|CREAD|CLOCAL;
+  cfsetospeed(&tty, B9600);
+  cfsetispeed(&tty, B9600);
+  // tty.c_cc[VMIN]  = 0;
+  // tty.c_cc[VTIME] = 0;
+
+  if(tcsetattr(xb, TCSANOW, &tty)==-1) {
+    daemonLog("Error setting serial port attributes %s - %s (%d)\n",xbeeSerialPort,strerror(errno),errno);
     return NULL;
   }
 
