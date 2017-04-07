@@ -5,22 +5,12 @@
 
 #include "PJ_RPI.h"
 
-// map the gpio area, if we can't do this, there's no point even trying to be a daemon
-#define SETUP_GPIO() do {\
-  if (map_peripheral(&gpio) == -1) {\
-    printf("Failed to map the physical GPIO registers into the virtual memory space.\n");\
-    return -1;\
-  }\
-} while (false);
-
 #else
 
 #define GPIO_CLR int dummy
 #define GPIO_SET int dummy
 #define INP_GPIO(x) 
 #define OUT_GPIO(x) 
-
-#define SETUP_GPIO() 
 
 #endif
 
@@ -66,23 +56,22 @@
 char * flasherPipe = "flasher";
 char * flasherPwd = NULL;
 char * flasherLog = "flasher.log";
-char * statsFilePath = "flasher.status";
+char * statsFilePath = "flasher.stats";
 char * dimmerStatusRoot = "dimmer";
 char * xbeeSerialPort = "/dev/ttyAMA0";
 
 // test mode, create a fake dimmer
 bool testMode = false;
+bool nodaemon = false;
+bool enableDimmer = true;
+bool enableGpio = true;
+bool enableStats = true;
+bool enableLog = true;
 
 
 
 
 // *** Structures, global memory, interrupt/signal handlers  *** /
-
-// latest dimmer state
-// typedef struct {
-//   char * latest;
-// } dimmer_state_t;
-// dimmer_state_t dimmerStates[10] = {0};
 
 // one thread for each pin to be PWMed
 typedef struct {
@@ -121,7 +110,7 @@ void sigInt(int signal) {
 // handle logging
 FILE * debugFile = NULL;
 void daemonLog(const char* format, ...) {
-  if (debugFile) {
+  if (debugFile&&enableLog) {
     const size_t messageSize = 500;
     char message[messageSize];
 
@@ -140,25 +129,36 @@ void daemonLog(const char* format, ...) {
 
     fprintf(debugFile,"%s %s",dt,message);
     fflush(debugFile);
+  } else if (nodaemon) {
+   va_list args;
+   va_start(args, format);
+   vprintf(format, args);
+   va_end(args);
+  }
+}
+
+void logStats(FILE * file) {
+  for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
+    if (pins[pin].thread) {
+      fprintf(file,"pin %d : flash = %lu, brightness = %.0f, power = %d\n",
+        pin,(unsigned long)pins[pin].flashPeriod,pins[pin].brightness,pins[pin].powerOn);
+    }
   }
 }
 
 void dumpStatsFile() {
-  FILE * statsFile = fopen(statsFilePath, "w+");
-  if (statsFile) {
-    daemonLog("created stats file\n");
-
-    for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
-      if (pins[pin].thread) {
-        fprintf(statsFile,"pin %d : flash = %lu, brightness = %.0f, power = %d\n",
-          pin,(unsigned long)pins[pin].flashPeriod,pins[pin].brightness,pins[pin].powerOn);
-      }
-    }
-
-    fclose(statsFile);
-    daemonLog("finished stats file and closed\n");
+  if (nodaemon) {
+    logStats(stdout);
   } else {
-    daemonLog("failed to create stats file\n");
+    FILE * statsFile = fopen(statsFilePath, "w+");
+    if (statsFile) {
+      daemonLog("created stats file\n");
+      logStats(statsFile);
+      fclose(statsFile);
+      daemonLog("finished stats file and closed\n");
+    } else {
+      daemonLog("failed to create stats file\n");
+    }
   }
 }
 
@@ -447,7 +447,7 @@ void doControlMessage(char * message) {
       unsigned char pin = atoi(pinBuf); // interpret that string as an integer
       message+=3;
       unsigned char newParameter = atoi(message);
-      if (dimmerMsg) {
+      if (dimmerMsg&&enableDimmer) {
         // send message to dimmer
         if (pin >= MIN_DIMMER && pin <= NUM_DIMMERS && openedSerialPort) {
           daemonLog("interpreting dimmer message %s\n",message);
@@ -491,7 +491,7 @@ void doControlMessage(char * message) {
         } else if (openedSerialPort) {
           daemonLog("pin %d is an invalid pin\n",pin);
         }
-      } else {
+      } else if (enableGpio) {
         daemonLog("adjusting pin %d\n",pin);
         if (pin >= MIN_PIN && pin < NUM_PINS) {
           INP_GPIO(pin);
@@ -585,8 +585,10 @@ void closeDimmerStatusThreads() {
 }
 
 void startSerialReadThread() {
-  if (pthread_create(&serialReadThread, NULL, serialPortRead, NULL)) {
-    daemonLog("Failed to create serial read thread %d\n",errno);
+  if (enableDimmer) {
+    if (pthread_create(&serialReadThread, NULL, serialPortRead, NULL)) {
+      daemonLog("Failed to create serial read thread %d\n",errno);
+    }
   }
 }
 
@@ -715,7 +717,9 @@ void openFifoWaitForMessagesUntilDaemonKilled() {
         // read flasher control first
         if (fgets(buf,CMD_BUF,flasherfile)) {
           doControlMessage(buf);
-          dumpStatsFile();
+          if (enableStats) {
+            dumpStatsFile();
+          }
         }
 
         usleep(dutyCycle); // reduce CPU load
@@ -757,13 +761,17 @@ void showHelp(char * executableFilename) {
   printf("\n%s runs as a daemon\n",rootFilename);
 
   printf("-s <serial port>  : open <serial port> for communication with dimmers.\n");
-  printf("-f <fifo>         : control fifo path, otherwise (defaults to /tmp/flasher)\n");
-  printf("-d <dbgfile>      : stats/debug file while running, otherwise (defaults to /tmp/flasher.stats)\n");
-  printf("-l <logfile>      : log file, otherwise (defaults to /tmp/flasher.log)\n");
-  printf("-w <workingDirectory> : otherwise (defaults to /tmp)\n");
-  printf("-r <dimmerStatusRoot> : the root for dimmer status fifo files, otherwise (defaults /tmp/dimmer)\n");
-  printf("--mode test : Enable test mode (outputs 50 on dimmer socket 1).\n");
-
+  printf("-f <fifo>         : control fifo path, otherwise (defaults to ./flasher).\n");
+  printf("-d <dbgfile>      : stats/debug file while running, otherwise (defaults to ./flasher.stats).\n");
+  printf("-l <logfile>      : log file, otherwise (defaults to ./flasher.log).\n");
+  printf("-w <workingDirectory> : otherwise (defaults to .).\n");
+  printf("-r <dimmerStatusRoot> : the root for dimmer status fifo files, otherwise (defaults ./dimmer).\n");
+  printf("--mode test       : Enable test mode (outputs 50 on dimmer socket 1).\n");
+  printf("-D                : do not daemonise, run in the foreground, all logging to stdout including stats.\n");
+  printf("--disable dimmer  : do not attempt to open the serial port, ignore d: control messages.\n");
+  printf("--disable gpio    : do not try to communicate with the GPIO.\n");
+  printf("--disable stats   : do not write stats file.\n");
+  printf("--disable log     : do not log anything (has no effect if running in foreground).\n");
   
   printf("\n\n");
   printf("To control a running daemon: echo (p|s|f):XX:YYY > <control fifo>\n");
@@ -780,56 +788,73 @@ void showHelp(char * executableFilename) {
 void interpretCommandLineParameters(int argc,char **argv) {
   // command line params
   // -s <port>    : open serial port for communication with dimmers
-  // -f <fifo>    : control fifo path, otherwise defaults to /tmp/flasher
-  // -d <dbgfile> : stats/debug file while running, otherwise defaults to /tmp/flasher.stats
-  // -l <logfile> : log file, otherwise defaults to /tmp/flasher.log
-  // -w <workingDirectory> : otherwise defaults to /tmp
-  // -r <dimmerStatusRoot> : the root for dimmer status fifo files, otherwise defaults /tmp/dimmer
+  // -f <fifo>    : control fifo path, otherwise defaults to ./flasher
+  // -d <dbgfile> : stats/debug file while running, otherwise defaults to ./flasher.stats
+  // -l <logfile> : log file, otherwise defaults to ./flasher.log
+  // -w <workingDirectory> : otherwise defaults to .
+  // -r <dimmerStatusRoot> : the root for dimmer status fifo files, otherwise defaults ./dimmer
   // --mode test : Enable test mode (outputs 50 on dimmer socket 1).
+  // --disable dimmer  ... do not attempt to open the dimmer (xbee) serial port, ignore d: control messages
+  // --disable gpio ... do not try to communicate with the GPIO port
+  // --disable stats ... do not write stats file
+  // --disable log ... do not log anything (has no effect if running in foreground)
 
   bool help = false;
 
-  if ((argc%2)==1) {
-    for (int i=0;i<argc;i++) {
-      if (strcmp("-s",argv[i])==0) {
-        if (++i<argc) {
-          xbeeSerialPort = argv[i];
+  for (int i=1;i<argc;i++) {
+    if (strcmp("-s",argv[i])==0) {
+      if (++i<argc) {
+        xbeeSerialPort = argv[i];
+      } else help = true;
+    } else if (strcmp("-f",argv[i])==0) {
+      if (++i<argc) {
+        flasherPipe = argv[i];
+      } else help = true;
+    } else if (strcmp("-d",argv[i])==0) {
+      if (++i<argc) {
+        statsFilePath = argv[i];
+      } else help = true;
+    } else if (strcmp("-l",argv[i])==0) {
+      if (++i<argc) {
+        flasherLog = argv[i];
+      } else help = true;
+    } else if (strcmp("-w",argv[i])==0) {
+      if (++i<argc) {
+        flasherPwd = argv[i];
+      } else help = true;
+    } else if (strcmp("-r",argv[i])==0) {
+      if (++i<argc) {
+        dimmerStatusRoot = argv[i];
+        // test max length etc. for edge cases
+        const int dimmerStatusRootMaxLength = 255;
+        int dimmerStatusRootLength = strnlen(dimmerStatusRoot,dimmerStatusRootMaxLength);
+        if (dimmerStatusRootLength==dimmerStatusRootMaxLength) {
+          printf("WARNING ** dimmer status root was too long, truncating to 255 characters!\n");
+          dimmerStatusRoot[dimmerStatusRootLength] = 0;
+        }
+      } else help = true;
+    } else if (strcmp("--mode",argv[i])==0) {
+      if (++i<argc&&strcmp("test",argv[i])==0) {
+        testMode = true;
+      } else help = true;
+    } else if (strcmp("--disable",argv[i])==0) {
+      // disable sub systems, pwm, dimmer pipes, etc.
+      if (++i<argc) {
+        if (strcmp("dimmer",argv[i])==0) {
+          enableDimmer = false;
+        } else if (strcmp("gpio",argv[i])==0) {
+          enableGpio = false;
+        } else if (strcmp("stats",argv[i])==0) {
+          enableStats = false;
+        } else if (strcmp("log",argv[i])==0) {
+          enableLog = false;
         } else help = true;
-      } else if (strcmp("-f",argv[i])==0) {
-        if (++i<argc) {
-          flasherPipe = argv[i];
-        } else help = true;
-      } else if (strcmp("-d",argv[i])==0) {
-        if (++i<argc) {
-          statsFilePath = argv[i];
-        } else help = true;
-      } else if (strcmp("-l",argv[i])==0) {
-        if (++i<argc) {
-          flasherLog = argv[i];
-        } else help = true;
-      } else if (strcmp("-w",argv[i])==0) {
-        if (++i<argc) {
-          flasherPwd = argv[i];
-        } else help = true;
-      } else if (strcmp("-r",argv[i])==0) {
-        if (++i<argc) {
-          dimmerStatusRoot = argv[i];
-          // test max length etc. for edge cases
-          const int dimmerStatusRootMaxLength = 255;
-          int dimmerStatusRootLength = strnlen(dimmerStatusRoot,dimmerStatusRootMaxLength);
-          if (dimmerStatusRootLength==dimmerStatusRootMaxLength) {
-            printf("WARNING ** dimmer status root was too long, truncating to 255 characters!\n");
-            dimmerStatusRoot[dimmerStatusRootLength] = 0;
-          }
-        } else help = true;
-      } else if (strcmp("--mode",argv[i])==0) {
-        if (++i<argc&&strcmp("test",argv[i])==0) {
-          testMode = true;
-        } else help = true;
-      }
+      } else help = true;
+    } else if (strcmp("-D",argv[i])==0) {
+      nodaemon = true;
+    } else {
+      help = true;
     }
-  } else {
-    help = true;
   }
 
   if (help) {
@@ -863,22 +888,39 @@ int main(int argc,char **argv)
   }
 
   setupSignalHandling();
-  becomeDaemon();
+
+  if (nodaemon) {
+    printf("Running in foreground\n");
+  } else {
+    becomeDaemon();
+  }
 
 
 
   // setup
 
-  SETUP_GPIO();
-  initialisePwmPinsState();
-  initialiseDimmerControlState();
-  startSerialReadThread();
+#ifndef mac
+  // map the gpio area, if we can't do this, there's no point even trying to be a daemon
+  if (map_peripheral(&gpio) == -1) {
+    printf("Failed to map the physical GPIO registers into the virtual memory space.\n");
+    return -1;
+  }
+#endif
+
+  if (enableGpio) {
+    initialisePwmPinsState();
+  }
+
+  if (enableDimmer) {
+    initialiseDimmerControlState();
+    startSerialReadThread();
+  }
 
 
 
   // testing
 
-  if (testMode) {
+  if (testMode&&enableDimmer) {
     updateDimmerStatus(1,50);
   }
 
@@ -895,8 +937,14 @@ int main(int argc,char **argv)
   // either we couldn't open the fifo or we opened it, ran for a bit and received a shutdown...
   daemonLog("preparing to shut down...\n");
   cleanupStatsFile();
-  cleanupPwmThreads();
-  closeDimmerStatusThreads();
+
+  if (enableGpio) {
+    cleanupPwmThreads();    
+  }
+
+  if (enableDimmer) {
+    closeDimmerStatusThreads();    
+  }
 
   return EXIT_SUCCESS; 
 }
