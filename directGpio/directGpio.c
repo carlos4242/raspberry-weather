@@ -451,7 +451,7 @@ void doControlMessage(char * message) {
         // send message to dimmer
         if (pin >= MIN_DIMMER && pin <= NUM_DIMMERS && openedSerialPort) {
           daemonLog("interpreting dimmer message %s\n",message);
-          daemonLog("char 1 is %c",message[0]);
+          daemonLog("char 1 is %c\n",message[0]);
 
           bool turnOff = message[0]=='_';
           bool turnOn = message[0]=='O';
@@ -462,32 +462,34 @@ void doControlMessage(char * message) {
             dimmers[pin].requestedBrightness = newParameter;
           }
 
-          #define SERIAL_OUT_BUFSIZE 8
+          #define SERIAL_OUT_BUFSIZE 9
 
     	    static char serialOutBuffer[SERIAL_OUT_BUFSIZE];
 
           bzero(serialOutBuffer,SERIAL_OUT_BUFSIZE);
 
           if (query) {
-            sprintf(serialOutBuffer,"DMR%d:??\n",pin);
+            snprintf(serialOutBuffer,SERIAL_OUT_BUFSIZE,"DMR%d:??\n",pin);
           } else if (turnOff) {
-            sprintf(serialOutBuffer,"DMR%d:__\n",pin);
+            snprintf(serialOutBuffer,SERIAL_OUT_BUFSIZE,"DMR%d:__\n",pin);
           } else if (turnOn) {
-            sprintf(serialOutBuffer,"DMR%d:OO\n",pin);
+            snprintf(serialOutBuffer,SERIAL_OUT_BUFSIZE,"DMR%d:OO\n",pin);
           } else {
             if (newParameter>90) {
               newParameter = 90;
             } else if (newParameter<5) {
               newParameter = 5;
             }
-            sprintf(serialOutBuffer,"DMR%d:%02d\n",pin,newParameter);
+            snprintf(serialOutBuffer,SERIAL_OUT_BUFSIZE,"DMR%d:%02d\n",pin,newParameter);
           }
 
           daemonLog("writing to serial port : %s\n",serialOutBuffer);
 
     	    if (write(openedSerialPort,serialOutBuffer,SERIAL_OUT_BUFSIZE)<0) {
-    	      daemonLog("Problem writing to serial port (%d) - (%s)",errno,strerror(errno));
+    	      daemonLog("Problem writing to serial port (%d) - (%s)\n",errno,strerror(errno));
     	    }
+
+          daemonLog("wrote to serial port\n",serialOutBuffer);
         } else if (openedSerialPort) {
           daemonLog("pin %d is an invalid pin\n",pin);
         }
@@ -518,7 +520,7 @@ void doControlMessage(char * message) {
             daemonLog("created thread for pin %d\n",pin);
           }
         } else {
-          daemonLog("invalid pin %d",pin);
+          daemonLog("invalid pin %d\n",pin);
         }
       }
     } else {
@@ -597,7 +599,7 @@ void printCwd() {
   if (!getcwd(pwdBuf,PATH_MAX)) {
     perror("cannot get cwd");
   } else {
-    printf("CWD = %s",pwdBuf);
+    printf("CWD = %s\n",pwdBuf);
   }
 }
 
@@ -713,13 +715,19 @@ void openFifoWaitForMessagesUntilDaemonKilled() {
     daemonLog("Waiting for messages on %s...\n",flasherPipe);
     FILE * flasherfile = fopen(flasherPipe,"r");
     if (flasherfile) {
+      
+      daemonLog("starting fifo loop\n");
+
       while (keepRunning) {
         // read flasher control first
+        // daemonLog("about to fgets\n");
         if (fgets(buf,CMD_BUF,flasherfile)) {
+          daemonLog("about to doControlMessage\n");
           doControlMessage(buf);
           if (enableStats) {
             dumpStatsFile();
           }
+          daemonLog("did doControlMessage\n");
         }
 
         usleep(dutyCycle); // reduce CPU load

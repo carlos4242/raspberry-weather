@@ -10,4 +10,6 @@ weather.txt
 directGpio/directGpio
 directGpio/directGpio2
 directGpio/macTests
+directGpio/macClang
+directGpio/macClang.*
 directGpio/directGpio.ll
