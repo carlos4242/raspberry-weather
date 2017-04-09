@@ -436,7 +436,7 @@ void doControlMessage(char * message) {
   bool steadyMsg=strncmp(message,"s:",2)==0;
   bool flashMsg=strncmp(message,"f:",2)==0;
   bool relayControlMsg=strncmp(message,"p:",2)==0;
-  bool dimmerMsg=strncmp(message,"d:",2)==0;
+  bool dimmerMsg=strncmp(message,"d:",2)==0&&enableDimmer;
   if (steadyMsg||flashMsg||relayControlMsg||dimmerMsg) { 
     message+=2;
     message[6]=0;
@@ -447,7 +447,7 @@ void doControlMessage(char * message) {
       unsigned char pin = atoi(pinBuf); // interpret that string as an integer
       message+=3;
       unsigned char newParameter = atoi(message);
-      if (dimmerMsg&&enableDimmer) {
+      if (dimmerMsg) {
         // send message to dimmer
         if (pin >= MIN_DIMMER && pin <= NUM_DIMMERS && openedSerialPort) {
           daemonLog("interpreting dimmer message %s\n",message);
@@ -495,6 +495,7 @@ void doControlMessage(char * message) {
         }
       } else if (enableGpio) {
         daemonLog("adjusting pin %d\n",pin);
+        
         if (pin >= MIN_PIN && pin < NUM_PINS) {
           INP_GPIO(pin);
           OUT_GPIO(pin); // Define pin as output
@@ -522,6 +523,8 @@ void doControlMessage(char * message) {
         } else {
           daemonLog("invalid pin %d\n",pin);
         }
+
+        dumpStatsFile();
       }
     } else {
       daemonLog("invalid control message - should be XX:Y or XX:YY or XX:YYY (XX=pin,Y[Y[Y]]=action) was %s\n",message);
@@ -713,31 +716,31 @@ void openFifoWaitForMessagesUntilDaemonKilled() {
   if (fifo_create_success == 0 || errno == EEXIST) {
 
     daemonLog("Waiting for messages on %s...\n",flasherPipe);
-    FILE * flasherfile = fopen(flasherPipe,"r");
-    if (flasherfile) {
-      
-      daemonLog("starting fifo loop\n");
-
-      while (keepRunning) {
-        // read flasher control first
-        // daemonLog("about to fgets\n");
-        if (fgets(buf,CMD_BUF,flasherfile)) {
-          daemonLog("about to doControlMessage\n");
+    while (keepRunning) {
+      FILE * controlPipeFile = fopen(flasherPipe,"r");
+      if (controlPipeFile) {
+        while(keepRunning&&fgets(buf,CMD_BUF,controlPipeFile)) {
           doControlMessage(buf);
-          if (enableStats) {
-            dumpStatsFile();
-          }
-          daemonLog("did doControlMessage\n");
+          usleep(dutyCycle); // reduce CPU load
         }
 
-        usleep(dutyCycle); // reduce CPU load
+        // check for errors
+        if (ferror(controlPipeFile)) {
+          daemonLog("Error on stream: %s (%d)\n",strerror(errno),errno);
+        }
+
+        if (feof(controlPipeFile)) {
+          daemonLog("EOF pipe/fifo:\n");
+        }
+
+        if (fclose(controlPipeFile)) {
+          daemonLog("%s failed to close fifo\n",strerror(errno));
+        }
+      } else if (errno!=EINTR) {
+        daemonLog("%s failed to open fifo (%d)\n",strerror(errno),errno);
       }
 
-      if (fclose(flasherfile)) {
-        daemonLog("%s failed to close fifo\n",strerror(errno));
-      }
-    } else if (errno!=EINTR) {
-      daemonLog("%s failed to open fifo (%d)\n",strerror(errno),errno);
+      usleep(dutyCycle); // reduce CPU load
     }
 
     if (unlink(flasherPipe)) {
