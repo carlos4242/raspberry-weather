@@ -25,7 +25,7 @@ function sendCommand(cmd) {
 
 function queryBrightness(light) {
 
-	sendCommand("d:"+(("0"+level).slice(-2))+":?");
+	sendCommand("d:"+(("0"+light).slice(-2))+":?");
 
 	var dimmerValue = Number(fs.readFileSync(dimmerReadableFifoPipeFile));
 	console.log("brightness read as : "+dimmerValue);
@@ -71,12 +71,12 @@ function restoreCurrentBrightness(forLight) {
 }
 
 function powerOff(light) {
-	sendCommand("d:"+(("0"+level).slice(-2))+":_");
+	sendCommand("d:"+(("0"+light).slice(-2))+":_");
 	setCurrentBrightness('off',light,false);
 }
 
 function powerOn(light) {
-	sendCommand("d:"+(("0"+level).slice(-2))+":O");
+	sendCommand("d:"+(("0"+light).slice(-2))+":O");
 	restoreCurrentBrightness(light);
 }
 
@@ -90,7 +90,7 @@ function powerLevel(level,light) {
 	}
 
 	setCurrentBrightness(level,light,true);
-	sendCommand("d:"+(("0"+level).slice(-2))+":"+(("0"+level).slice(-3)));
+	sendCommand("d:"+(("0"+light).slice(-2))+":"+(("0"+level).slice(-3)));
 }
 
 console.log('attempting to start http server...');
