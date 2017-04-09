@@ -2,6 +2,7 @@
 forever
 flasher.log
 flasher.status
+flasher.stats
 flasher
 dimmer*
 *.json

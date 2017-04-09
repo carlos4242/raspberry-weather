@@ -7,7 +7,7 @@ function refresh() {
 }
 
 function setLamp(value,lamp) {
-	$.get('/light?powerLevel='+value+'&lamp='+lamp,function(){
+	$.get('/light?light='+lamp+'&powerLevel='+value,function(){
 		refresh();
 	});
 }

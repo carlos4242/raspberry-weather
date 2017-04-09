@@ -20,6 +20,7 @@ var savedBrightness3 = 0;
 
 function sendCommand(cmd) {
 	// send the command request to the arduino (via the gpio daemon)
+	console.log('writing command : '+cmd+' to '+gpioWriteableFifoPipeFile);
 	fs.writeFileSync(gpioWriteableFifoPipeFile,cmd,{flag:'a'});
 }
 
@@ -120,13 +121,17 @@ app.use('/res',express.static(__dirname + '/res'));
 // any number below 0 will be read as 0 and any number above 138 will be read as 138
 
 app.get('/', function(req, res) {
-console.log('serving site');
+	console.log('serving site');
 	queryBrightness();
+
 	if (currentBrightness<0) {
 		lamp1Brightness = 90;
 	} else {
 		lamp1Brightness = currentBrightness;		
 	}
+
+	console.log('lamp1Brightness : '+lamp1Brightness);
+
 	res.render('index',{lampBrightness:lamp1Brightness,lampBrightness2:currentBrightness2,lampBrightness3:currentBrightness3});
 	res.end();
 });
@@ -138,6 +143,8 @@ app.get('/light', function(req,res) {
 		light = 1;
 	}
 
+	console.log('light read as : '+light);
+
 	if (req.query.power == 'on') {
 		powerOn(light);
 		res.end();
@@ -145,6 +152,7 @@ app.get('/light', function(req,res) {
 		powerOff(light);
 		res.end();
 	} else if (req.query.powerLevel != undefined) {
+		console.log('powerLevel read as : '+req.query.powerLevel);
 		powerLevel(req.query.powerLevel,light);
 		res.end();
 	} else {
