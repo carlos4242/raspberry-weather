@@ -122,7 +122,12 @@ app.use('/res',express.static(__dirname + '/res'));
 app.get('/', function(req, res) {
 console.log('serving site');
 	queryBrightness();
-	res.render('index',{lampBrightness:currentBrightness,lampBrightness2:currentBrightness2,lampBrightness3:currentBrightness3});
+	if (currentBrightness<0) {
+		lamp1Brightness = 90;
+	} else {
+		lamp1Brightness = currentBrightness;		
+	}
+	res.render('index',{lampBrightness:lamp1Brightness,lampBrightness2:currentBrightness2,lampBrightness3:currentBrightness3});
 	res.end();
 });
 
