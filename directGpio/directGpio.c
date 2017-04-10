@@ -733,14 +733,15 @@ void openFifoWaitForMessagesUntilDaemonKilled() {
           daemonLog("EOF pipe/fifo:\n");
         }
 
+        usleep(dutyCycle); // reduce CPU load
+
         if (fclose(controlPipeFile)) {
           daemonLog("%s failed to close fifo\n",strerror(errno));
         }
       } else if (errno!=EINTR) {
         daemonLog("%s failed to open fifo (%d)\n",strerror(errno),errno);
+        usleep(dutyCycle); // reduce CPU load
       }
-
-      usleep(dutyCycle); // reduce CPU load
     }
 
     if (unlink(flasherPipe)) {
