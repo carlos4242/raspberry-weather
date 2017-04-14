@@ -460,7 +460,15 @@ void doControlMessage(char * message) {
 
           if (powerLevelMsg) {
             dimmers[pin].requestedBrightness = newParameter;
+            dimmers[pin].currentBrightness = newParameter;
           }
+
+          if (turnOff) {
+            dimmers[pin].requestedBrightness = -1;
+            dimmers[pin].currentBrightness = -1;
+          }
+
+          // we can't know what brightness to expect when we turn a light on
 
           #define SERIAL_OUT_BUFSIZE 9
 
