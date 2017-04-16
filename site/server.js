@@ -7,6 +7,22 @@ const weatherSummaryFile = '../weather.txt';
 const accessLogFile = '../access.log';
 const errorLogFile = '../error.log';
 
+
+var express = require('express');
+var app = express();
+var port = process.env.PORT || 80;
+var server = require('http').createServer(app);
+var bodyParser = require('body-parser');
+var fs = require('fs');
+
+var currentBrightness = 'unknown';
+var currentBrightness2 = 'unknown';
+var currentBrightness3 = 'unknown';
+var savedBrightness = 0;
+var savedBrightness2 = 0;
+var savedBrightness3 = 0;
+
+
 if (process.argv.slice(2) == 'daemon') {
 	var access = fs.createWriteStream(accessLogFile, { flags: 'a' })
 	      , error = fs.createWriteStream(errorLogFile, { flags: 'a' });
@@ -16,18 +32,6 @@ if (process.argv.slice(2) == 'daemon') {
 	proc.stderr.pipe(error);	
 }
 
-var express = require('express');
-var app = express();
-var port = process.env.PORT || 80;
-var server = require('http').createServer(app);
-var bodyParser = require('body-parser');
-var fs = require('fs');
-var currentBrightness = 'unknown';
-var currentBrightness2 = 'unknown';
-var currentBrightness3 = 'unknown';
-var savedBrightness = 0;
-var savedBrightness2 = 0;
-var savedBrightness3 = 0;
 
 function sendCommand(cmd) {
 	// send the command request to the arduino (via the gpio daemon)
