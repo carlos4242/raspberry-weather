@@ -28,8 +28,8 @@ if (process.argv.slice(2) == 'daemon') {
 	      , error = fs.createWriteStream(errorLogFile, { flags: 'a' });
 
 	// redirect stdout / stderr
-	proc.stdout.pipe(access);
-	proc.stderr.pipe(error);	
+	process.stdout.pipe(access);
+	process.stderr.pipe(error);	
 }
 
 
