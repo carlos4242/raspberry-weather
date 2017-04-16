@@ -33,7 +33,9 @@ function sendCommand(cmd) {
 	// send the command request to the arduino (via the gpio daemon)
 	console.log('writing command : '+cmd+' to '+gpioWriteableFifoPipeFile);
 	fs.writeFile(gpioWriteableFifoPipeFile,cmd,{flag:'a'}, function(error) {
-		console.log('error writing command : '+error);
+		if (error) {
+			console.log('error writing command : '+error);
+		}
 	});
 }
 
