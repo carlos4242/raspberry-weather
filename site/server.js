@@ -24,12 +24,6 @@ var savedBrightness3 = 0;
 
 
 if (process.argv.slice(2) == 'daemon') {
-	var access = fs.createWriteStream(accessLogFile, { flags: 'a' })
-	      , error = fs.createWriteStream(errorLogFile, { flags: 'a' });
-
-	// redirect stdout / stderr
-	process.stdout.pipe(access);
-	process.stderr.pipe(error);	
 }
 
 
