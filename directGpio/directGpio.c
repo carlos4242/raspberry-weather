@@ -187,13 +187,15 @@ void *flasher(void *pptr)
   while(keepRunning) // each run of the loop should take one duty cycle... i.e. 100Hz
   {
     if (!pin->flashPeriod && pin->brightness<FLT_EPSILON) {
-      usleep(dutyCycle);
+      // we are not flashing or steady, do nothing much, then wait for next cycle
       if (pin->powerOn) {
         GPIO_SET = 1 << pin->pin;
       } else {
         GPIO_CLR = 1 << pin->pin;
       }
+      usleep(dutyCycle);
     } else {
+      // we are either on steady or flashing, so implement PWM to light the LED accordingly
       useconds_t flashRate = pin->flashPeriod;
       useconds_t flashSteps = flashRate / dutyCycle;
       if (flashSteps >= 10) {
@@ -276,13 +278,13 @@ void *dimmerWriter(void *pptr)
           daemonLog("Closed pipe %s...\n",dimmerPipeName);
         }
       } else {
+        usleep(dutyCycle); // reduce CPU load and prevent multiple opening
+
         // failed to open pipe, this could be a normal part of shutting down... a signal
         if (errno != EINTR) {
           daemonLog("Problem opening pipe %s (%s)...\n",dimmerPipeName,strerror(errno));
         }
       }
-
-      usleep(dutyCycle); // reduce CPU load and prevent multiple opening
     }
 
     if (unlink(dimmerPipeName)) {
@@ -308,6 +310,9 @@ int openedSerialPort = 0;
 void *serialPortRead(void *pptr) {
 
   // attempt to open the serial port
+  // we open the port in nonblocking mode because we want writes to the port to be non blocking
+  // because they occur inline, after interpreting a d: message to the FIFO
+  // that means a little extra logic to handle nonblocking reads but it's nothing too difficult
   int xb = open(xbeeSerialPort,O_RDWR|O_NOCTTY|O_NONBLOCK);
   if (xb==-1) {
     daemonLog("Failed to open serial port %s - %s (%d)\n",xbeeSerialPort,strerror(errno),errno);
@@ -321,11 +326,9 @@ void *serialPortRead(void *pptr) {
   }
 
   cfmakeraw(&tty);
-  tty.c_cflag = B9600|CS8|CREAD|CLOCAL;
+  tty.c_cflag = B9600|CS8|CREAD|CLOCAL; // connect to the xbee using 9600 baud, 8N1, readable, local (not using a modem)
   cfsetospeed(&tty, B9600);
   cfsetispeed(&tty, B9600);
-  // tty.c_cc[VMIN]  = 0;
-  // tty.c_cc[VTIME] = 0;
 
   if(tcsetattr(xb, TCSANOW, &tty)==-1) {
     daemonLog("Error setting serial port attributes %s - %s (%d)\n",xbeeSerialPort,strerror(errno),errno);
@@ -362,9 +365,9 @@ void *serialPortRead(void *pptr) {
       // also it is not EAGAIN or EINTR, which would just mean
       // there was no bytes available or a signal interrupted the read system call
       daemonLog("Error reading from the serial port %s - %s (%d)\n",xbeeSerialPort,strerror(errno),errno);
+    } else {
+      usleep(dutyCycle); // reduce CPU load - either no bytes available or eof detected (should be impossible with CLOCAL)
     }
-
-    usleep(dutyCycle); // reduce CPU load
   }
 
   openedSerialPort = 0;
