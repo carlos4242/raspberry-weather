@@ -271,12 +271,16 @@ void *dimmerWriter(void *pptr)
         // write the status message, then close
         fprintf(dimmerFile, "%d\n", dimmer->currentBrightness);
 
+        fflush(dimmerFile);
+
         if (fclose(dimmerFile)) {
           daemonLog("%s failed to close fifo\n",strerror(errno));
         } else {
         // this logging will be excessive once the program is working nominially and can be removed then
           daemonLog("Closed pipe %s...\n",dimmerPipeName);
         }
+
+        usleep(500); // wait for close to take effect
       } else {
         usleep(dutyCycle); // reduce CPU load and prevent multiple opening
 
