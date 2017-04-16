@@ -4,6 +4,17 @@ const dimmerReadableFifoPipeFile = '../dimmer1';
 const dimmerReadableFifoPipeFile2 = '../dimmer2';
 const dimmerReadableFifoPipeFile3 = '../dimmer3';
 const weatherSummaryFile = '../weather.txt';
+const accessLogFile = '../access.log';
+const errorLogFile = '../error.log';
+
+if (process.argv.slice(2) == 'daemon') {
+	var access = fs.createWriteStream(accessLogFile, { flags: 'a' })
+	      , error = fs.createWriteStream(errorLogFile, { flags: 'a' });
+
+	// redirect stdout / stderr
+	proc.stdout.pipe(access);
+	proc.stderr.pipe(error);	
+}
 
 var express = require('express');
 var app = express();
@@ -21,11 +32,13 @@ var savedBrightness3 = 0;
 function sendCommand(cmd) {
 	// send the command request to the arduino (via the gpio daemon)
 	console.log('writing command : '+cmd+' to '+gpioWriteableFifoPipeFile);
-	fs.writeFileSync(gpioWriteableFifoPipeFile,cmd,{flag:'a'});
+	fs.writeFile(gpioWriteableFifoPipeFile,cmd,{flag:'a'}, function(error) {
+		console.log('error writing command : '+error);
+	});
 }
 
 function queryBrightness(light) {
-
+	// trigger an update to refresh the values for the next time this is called
 	sendCommand("d:"+(("0"+light).slice(-2))+":?");
 
 	var dimmerValue = Number(fs.readFileSync(dimmerReadableFifoPipeFile));
