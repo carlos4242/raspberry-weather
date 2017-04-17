@@ -3,6 +3,17 @@ function refresh() {
 		document.getElementById('lamp').value = data.light;
 		document.getElementById('lamp2').value = data.light2;
 		document.getElementById('lamp3').value = data.light3;
+
+		var lamp1On = data.light>0;
+
+		var lamp1SwitchText;
+		if (lamp1On) {
+			lamp1SwitchText = 'LAMP ON';
+		} else {
+			lamp1SwitchText = 'LAMP OFF';
+		}
+
+		document.getElementById('lamp1Switch').innerHtml = lamp1SwitchText;
 	});
 }
 

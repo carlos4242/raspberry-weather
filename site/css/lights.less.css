@@ -3,3 +3,7 @@ div#pageTitle {
    font-weight: bold;
    display: block;
 }
+
+span.switchText {
+	border: 1px solid black;
+}

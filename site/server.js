@@ -138,14 +138,22 @@ app.get('/', function(req, res) {
 	queryBrightness();
 
 	if (currentBrightness<0) {
+		lamp1On = false;
 		lamp1Brightness = 90;
 	} else {
+		lamp1On = true;
 		lamp1Brightness = currentBrightness;		
 	}
 
 	console.log('lamp1Brightness : '+lamp1Brightness);
 
-	res.render('index',{lampBrightness:lamp1Brightness,lampBrightness2:currentBrightness2,lampBrightness3:currentBrightness3});
+	if (lamp1On) {
+		lamp1SwitchText = 'LAMP ON';
+	} else {
+		lamp1SwitchText = 'LAMP OFF';
+	}
+
+	res.render('index',{lampBrightness:lamp1Brightness,lamp1SwitchText:lamp1SwitchText,lampBrightness2:currentBrightness2,lampBrightness3:currentBrightness3});
 	res.end();
 });
 
