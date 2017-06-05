@@ -1,9 +1,5 @@
 function refresh() {
 	$.get('/light',function(data,status) {
-		document.getElementById('lamp').value = data.light;
-		document.getElementById('lamp2').value = data.light2;
-		document.getElementById('lamp3').value = data.light3;
-
 		var lamp1On = data.light>0;
 
 		var lamp1SwitchText;
@@ -13,12 +9,38 @@ function refresh() {
 			lamp1SwitchText = 'LAMP OFF';
 		}
 
+		if (!lamp1On) {
+			data.light = 90;
+		}
+
+		document.getElementById('lamp').value = data.light;
+		document.getElementById('lamp2').value = data.light2;
+		document.getElementById('lamp3').value = data.light3;
 		document.getElementById('lamp1Switch').innerHtml = lamp1SwitchText;
+
+		if (lamp1On) {
+			document.getElementById('lamp').removeAttribute("disabled");
+		} else {
+			document.getElementById('lamp').setAttribute("disabled","disabled");
+		}
 	});
 }
 
 function setLamp(value,lamp) {
 	$.get('/light?light='+lamp+'&powerLevel='+value,function(){
+		refresh();
+	});
+}
+
+function toggleLamp(lampOn,lamp) {
+	var power;
+	if (lampOn) {
+		power = 'off';
+	} else {
+		power = 'on';
+	}
+
+	$.get('/light?light='+lamp+'&power='+power,function(){
 		refresh();
 	});
 }
@@ -35,10 +57,41 @@ $(document).ready(function(){
 	$('#lamp3').prop('disabled', false).change(function(){
 		setLamp($(this).val(),3);
 	});
-	//lamp2
-	//lamp3
 
+	$('#lamp1Switch').click(function(){
+		// use if slider is disabled to indicate the lamp state
+		var lampOn = !document.getElementById('lamp').disabled;
+		toggleLamp(lampOn,1);
+	});
 
 	refresh();
+
 	setInterval(refresh, 10000);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

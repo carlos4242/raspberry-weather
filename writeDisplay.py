@@ -75,8 +75,8 @@ for h in range(0, hours-1):
 	t1 = temps.get(str(h+1),-255)
 	x0=h*hourStep
 	x1=x0+hourStep
-	y0=bottom-(t0+1)*tempStep
-	y1=bottom-(t1+1)*tempStep
+	y0=bottom-(t0-5)*tempStep
+	y1=bottom-(t1-5)*tempStep
 	if t0>-255 and t1>-255:
 		draw.line((x0,y0,x1,y1), fill=255)
 		if h==highTempHour:

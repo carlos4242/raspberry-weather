@@ -153,7 +153,16 @@ app.get('/', function(req, res) {
 		lamp1SwitchText = 'LAMP OFF';
 	}
 
-	res.render('index',{lampBrightness:lamp1Brightness,lamp1SwitchText:lamp1SwitchText,lampBrightness2:currentBrightness2,lampBrightness3:currentBrightness3});
+	res.render(
+		'index',
+		{
+			lampBrightness:lamp1Brightness,
+			lamp1SwitchText:lamp1SwitchText,
+			lampBrightness2:currentBrightness2,
+			lampBrightness3:currentBrightness3
+		}
+	);
+
 	res.end();
 });
 
