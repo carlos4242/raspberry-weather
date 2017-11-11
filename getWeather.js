@@ -77,6 +77,8 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 			var writableStream = fs.createWriteStream(gpioPipe);
 			if (snow) {
 				writableStream.write('s:'+whitePin+':150\n');
+			} else if (alert) {
+				writableStream.write('s:'+whitePin+':15\n');
 			} else if (hail) {
 				writableStream.write('f:'+whitePin+':005\n');
 			} else {
@@ -110,9 +112,7 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 				writableStream.write('s:'+yellowPin+':000\n');
 			}
 
-			if (alert) {
-				writableStream.write('f:'+redPin+':004\n');
-			} else if (rain) {
+			if (rain) {
 				var ps = pi * 10;
 				if (ps < 0) {
 					ps = 0;
