@@ -1,4 +1,3 @@
-var request = require("request");
 var Service, Characteristic;
 
 module.exports = function(homebridge) {
