@@ -135,6 +135,8 @@ Faeries.prototype.setState = function(state, callback) {
     powerOff(5);
   }
 
+  callback(null);
+
   // var lockitronState = (state == Characteristic.LockTargetState.SECURED) ? "lock" : "unlock";
 
   // this.log("Set state to %s", lockitronState);
