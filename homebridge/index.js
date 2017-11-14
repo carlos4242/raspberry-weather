@@ -89,9 +89,9 @@ function Faeries(log, config) {
   
   this.service = new Service.Lightbulb(this.name);
   
-  this.service
-    .getCharacteristic(Characteristic.On)
-    .on('get', this.getState.bind(this));
+  // this.service
+  //   .getCharacteristic(Characteristic.On)
+  //   .on('get', this.getState.bind(this));
   
   this.service
     .getCharacteristic(Characteristic.On)
