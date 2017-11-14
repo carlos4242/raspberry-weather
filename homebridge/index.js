@@ -14,50 +14,41 @@ const dimmerReadableFifoPipeFile3 = '/home/carlpeto/node/dimmer7';
 const accessLogFile = '/home/carlpeto/node/access.log';
 const errorLogFile = '/home/carlpeto/node/error.log';
 
-var currentBrightness = 'unknown';
-var currentBrightness2 = 'unknown';
-var currentBrightness3 = 'unknown';
-var savedBrightness = 0;
-var savedBrightness2 = 0;
-var savedBrightness3 = 0;
+var currentBrightness = 0;
+var currentBrightness2 = 0;
+var currentBrightness3 = 0;
 
 var fs = require('fs');
 
-function setCurrentBrightness(b,forLight,andSave) {
+function setCurrentBrightness(b,forLight) {
   if (forLight==5) {
     currentBrightness = b;
-    if (andSave) {
-      savedBrightness = b;
-    }
   } else if (forLight==6) {
     currentBrightness2 = b;
-    if (andSave) {
-      savedBrightness2 = b;
-    }
   } else if (forLight==7) {
     currentBrightness3 = b;
-    if (andSave) {
-      savedBrightness3 = b;
-    }
   }
 }
 
 function queryBrightness(light) {
   // trigger an update to refresh the values for the next time this is called
-  sendCommand("d:"+(("0"+light).slice(-2))+":?");
+  sendCommand("d:"+(("0"+light).slice(-2))+":??");
 
-  var dimmerValue = Number(fs.readFileSync(dimmerReadableFifoPipeFile));
-  console.log("brightness read as : "+dimmerValue);
+  var dimmerValueText = fs.readFileSync(dimmerReadableFifoPipeFile);
+  var dimmerValue = Number(dimmerValueText);
+  console.log("brightness ["+dimmerValueText+"] read as : "+dimmerValue);
 
-  var dimmerValue2 = Number(fs.readFileSync(dimmerReadableFifoPipeFile2));
-  console.log("brightness2 read as : "+dimmerValue2);
+  var dimmerValue2Text = fs.readFileSync(dimmerReadableFifoPipeFile2);
+  var dimmerValue2 = Number(dimmerValue2Text);
+  console.log("brightness2 ["+dimmerValue2Text+"] read as : "+dimmerValue2);
 
-  var dimmerValue3 = Number(fs.readFileSync(dimmerReadableFifoPipeFile3));
-  console.log("brightness3 read as : "+dimmerValue3);
+  var dimmerValue3Text = fs.readFileSync(dimmerReadableFifoPipeFile3);
+  var dimmerValue3 = Number(dimmerValue3Text);
+  console.log("brightness3 ["+dimmerValue3Text+"] read as : "+dimmerValue3);
 
-  setCurrentBrightness(dimmerValue,5,true);
-  setCurrentBrightness(dimmerValue2,6,true);
-  setCurrentBrightness(dimmerValue3,7,true);
+  setCurrentBrightness(dimmerValue,5);
+  setCurrentBrightness(dimmerValue2,6);
+  setCurrentBrightness(dimmerValue3,7);
 }
 
 function sendCommand(cmd, callback) {
@@ -74,13 +65,13 @@ function sendCommand(cmd, callback) {
 }
 
 function powerOff(light) {
-  sendCommand("d:"+(("0"+light).slice(-2))+":_");
-  setCurrentBrightness('off',light,false);
+  sendCommand("d:"+(("0"+light).slice(-2))+":__");
+  setCurrentBrightness(-1,light);
 }
 
 function powerOn(light) {
-  sendCommand("d:"+(("0"+light).slice(-2))+":O");
-  restoreCurrentBrightness(light);
+  sendCommand("d:"+(("0"+light).slice(-2))+":01");
+  setCurrentBrightness(1,light);
 }
 
 function Faeries(log, config) {
@@ -88,10 +79,6 @@ function Faeries(log, config) {
   this.name = config["name"];
   
   this.service = new Service.Lightbulb(this.name);
-  
-  // this.service
-  //   .getCharacteristic(Characteristic.On)
-  //   .on('get', this.getState.bind(this));
   
   this.service
     .getCharacteristic(Characteristic.On)
