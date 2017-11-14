@@ -7,12 +7,12 @@ module.exports = function(homebridge) {
   homebridge.registerAccessory("homebridge-faeries", "Faeries", Faeries);
 }
 
-const gpioWriteableFifoPipeFile = '../flasher';
-const dimmerReadableFifoPipeFile = '../dimmer5';
-const dimmerReadableFifoPipeFile2 = '../dimmer6';
-const dimmerReadableFifoPipeFile3 = '../dimmer7';
-const accessLogFile = '../access.log';
-const errorLogFile = '../error.log';
+const gpioWriteableFifoPipeFile = '/home/carlpeto/node/flasher';
+const dimmerReadableFifoPipeFile = '/home/carlpeto/node/dimmer5';
+const dimmerReadableFifoPipeFile2 = '/home/carlpeto/node/dimmer6';
+const dimmerReadableFifoPipeFile3 = '/home/carlpeto/node/dimmer7';
+const accessLogFile = '/home/carlpeto/node/access.log';
+const errorLogFile = '/home/carlpeto/node/error.log';
 
 var currentBrightness = 'unknown';
 var currentBrightness2 = 'unknown';
