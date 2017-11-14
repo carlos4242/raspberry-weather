@@ -19,6 +19,8 @@ var currentBrightness2 = 0;
 var currentBrightness3 = 0;
 
 var fs = require('fs');
+var os = require('os');
+
 
 function setCurrentBrightness(b,forLight) {
   if (forLight==5) {
@@ -30,20 +32,25 @@ function setCurrentBrightness(b,forLight) {
   }
 }
 
+function readNumber(text) {
+  var firstLine = text.split(os.EOL)[0];
+  return Number(firstLine);
+}
+
 function queryBrightness(light) {
   // trigger an update to refresh the values for the next time this is called
   sendCommand("d:"+(("0"+light).slice(-2))+":??");
 
   var dimmerValueText = fs.readFileSync(dimmerReadableFifoPipeFile);
-  var dimmerValue = Number(dimmerValueText);
+  var dimmerValue = readNumber(dimmerValueText);
   console.log("brightness ["+dimmerValueText+"] read as : "+dimmerValue);
 
   var dimmerValue2Text = fs.readFileSync(dimmerReadableFifoPipeFile2);
-  var dimmerValue2 = Number(dimmerValue2Text);
+  var dimmerValue2 = readNumber(dimmerValue2Text);
   console.log("brightness2 ["+dimmerValue2Text+"] read as : "+dimmerValue2);
 
   var dimmerValue3Text = fs.readFileSync(dimmerReadableFifoPipeFile3);
-  var dimmerValue3 = Number(dimmerValue3Text);
+  var dimmerValue3 = readNumber(dimmerValue3Text);
   console.log("brightness3 ["+dimmerValue3Text+"] read as : "+dimmerValue3);
 
   setCurrentBrightness(dimmerValue,5);
