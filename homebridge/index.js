@@ -33,7 +33,7 @@ function setCurrentBrightness(b,forLight) {
 }
 
 function readNumber(text) {
-  var firstLine = text.split(os.EOL)[0];
+  var firstLine = (""+text).split(os.EOL)[0];
   return Number(firstLine);
 }
 
