@@ -4,15 +4,15 @@ module.exports = function(homebridge) {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
   
-  homebridge.registerAccessory("homebridge-faeries", "Faeries", Faeries);
+  homebridge.registerAccessory("homebridge-custom-light", "Custom Light", CustomLight);
 }
 
 const gpioWriteableFifoPipeFile = '/home/carlpeto/node/flasher';
 const dimmerReadableFifoPipeFile = '/home/carlpeto/node/dimmer5';
 const dimmerReadableFifoPipeFile2 = '/home/carlpeto/node/dimmer6';
 const dimmerReadableFifoPipeFile3 = '/home/carlpeto/node/dimmer7';
-const accessLogFile = '/home/carlpeto/node/access.log';
-const errorLogFile = '/home/carlpeto/node/error.log';
+const accessLogFile = '/home/carlpeto/node/homebridge/access.log';
+const errorLogFile = '/home/carlpeto/node/homebridge/error.log';
 
 var currentBrightness = 0;
 var currentBrightness2 = 0;
@@ -29,6 +29,16 @@ function setCurrentBrightness(b,forLight) {
     currentBrightness2 = b;
   } else if (forLight==7) {
     currentBrightness3 = b;
+  }
+}
+
+function getCurrentBrightness(forLight) {
+  if (forLight==5) {
+    return currentBrightness;
+  } else if (forLight==6) {
+    return currentBrightness2;
+  } else if (forLight==7) {
+    return currentBrightness3;
   }
 }
 
@@ -81,9 +91,23 @@ function powerOn(light) {
   setCurrentBrightness(1,light);
 }
 
-function Faeries(log, config) {
+function CustomLight(log, config) {
   this.log = log;
   this.name = config["name"];
+
+  if (config["light"] != undefined) {
+    this.log("light from config: "+config["light"]);
+    this.light = config["light"];
+  } else {
+    this.light = 5;
+  }
+
+  if (config["inverted"] != undefined) {
+    this.log("inverted from config: "+config["inverted"]);
+    this.inverted = config["inverted"];
+  } else {
+    this.inverted = false;
+  }
   
   this.service = new Service.Lightbulb(this.name);
   
@@ -93,14 +117,14 @@ function Faeries(log, config) {
     .on('set', this.setState.bind(this));
 }
 
-Faeries.prototype.getState = function(callback) {
+CustomLight.prototype.getState = function(callback) {
   this.log("Getting current state...");
 
-  queryBrightness(5);
+  queryBrightness(this.light);
 
   // firstly just check the one light, dimmer5
 
-  callback(null, currentBrightness == 1); // success
+  callback(null, getCurrentBrightness(this.light) == 1); // success
   
   // request.get({
   //   url: "https://api.lockitron.com/v2/locks/"+this.lockID,
@@ -121,12 +145,12 @@ Faeries.prototype.getState = function(callback) {
   // }.bind(this));
 }
   
-Faeries.prototype.setState = function(state, callback) {
+CustomLight.prototype.setState = function(state, callback) {
 
-  if (state) {
-    powerOn(5);
+  if (state!=this.inverted) {
+    powerOn(this.light);
   } else {
-    powerOff(5);
+    powerOff(this.light);
   }
 
   callback(null);

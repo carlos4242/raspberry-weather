@@ -1,7 +1,7 @@
 {
-  "name": "homebridge-faeries",
+  "name": "homebridge-custom-light",
   "version": "0.0.1",
-  "description": "Homebridge fairy lights",
+  "description": "Homebridge custom relay lights",
   "license": "ISC",
   "keywords": [
     "homebridge-plugin"
