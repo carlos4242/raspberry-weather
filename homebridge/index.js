@@ -183,6 +183,6 @@ CustomLight.prototype.setState = function(state, callback) {
   // }.bind(this));
 }
 
-Faeries.prototype.getServices = function() {
+CustomLight.prototype.getServices = function() {
   return [this.service];
 }
