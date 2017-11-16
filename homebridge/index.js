@@ -124,7 +124,7 @@ CustomLight.prototype.getState = function(callback) {
 
   // firstly just check the one light, dimmer5
 
-  callback(null, getCurrentBrightness(this.light) == 1); // success
+  callback(null, (getCurrentBrightness(this.light) == 1) != this.inverted); // success
   
   // request.get({
   //   url: "https://api.lockitron.com/v2/locks/"+this.lockID,
