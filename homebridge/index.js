@@ -229,6 +229,9 @@ CustomLight.prototype.getState = function(callback) {
 
   queryBrightness(this.light);
 
+  var active = (getCurrentBrightness(this.light) == 1) != this.inverted;
+  this.log("raw: "+getCurrentBrightness(this.light)+"active: "+active+" inverted: "+this.inverted+", light: "+this.light);
+
   callback(null, (getCurrentBrightness(this.light) == 1) != this.inverted);
 }
   
