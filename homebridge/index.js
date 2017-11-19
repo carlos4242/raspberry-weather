@@ -99,6 +99,7 @@ function readBrightnessValueFromFile(filename)
   var valueText = fs.readFileSync(filename);
   var value = readNumber(valueText);
   console.log("brightness ["+valueText+"] read as : "+value+" from "+filename);
+  return value;
 }
 
 function queryBrightness(light)
