@@ -28,35 +28,61 @@ var currentBrightness5 = 0;
 var currentBrightness6 = 0;
 var currentBrightness7 = 0;
 
+var savedBrightness1 = 0;
+var savedBrightness2 = 0;
+var savedBrightness3 = 0;
+
+var savedBrightness5 = 0;
+var savedBrightness6 = 0;
+var savedBrightness7 = 0;
+
 var fs = require('fs');
 var os = require('os');
 
 
-function setCurrentBrightness(b,forLight)
+function setCurrentBrightness(b,forLight,andSave=false)
 {
   if (forLight==5)
   {
     currentBrightness5 = b;
+    if (andSave) {
+      savedBrightness5 = b;
+    }
   }
   else if (forLight==6)
   {
     currentBrightness6 = b;
+    if (andSave) {
+      savedBrightness6 = b;
+    }
   }
   else if (forLight==7)
   {
     currentBrightness7 = b;
+    if (andSave) {
+      savedBrightness7 = b;
+    }
   }
   else if (forLight==1)
   {
     currentBrightness1 = b;
+    if (andSave) {
+      savedBrightness1 = b;
+    }
   }
   else if (forLight==2)
   {
     currentBrightness2 = b;
+    if (andSave) {
+      savedBrightness2 = b;
+    }
   }
   else if (forLight==3)
   {
     currentBrightness3 = b;
+    if (andSave) {
+      savedBrightness3 = b;
+    }
   }
 }
 
@@ -85,6 +111,34 @@ function getCurrentBrightness(forLight)
   else if (forLight==3)
   {
     return currentBrightness3;
+  }
+}
+
+function restoreCurrentBrightness(forLight)
+{
+  if (forLight==1)
+  {
+    currentBrightness1 = savedBrightness1;
+  }
+  else if (forLight==2)
+  {
+    currentBrightness2 = savedBrightness2;
+  }
+  else if (forLight==3)
+  {
+    currentBrightness3 = savedBrightness3;
+  }
+  else if (forLight==5)
+  {
+    currentBrightness5 = savedBrightness5;
+  }
+  else if (forLight==6)
+  {
+    currentBrightness6 = savedBrightness6;
+  }
+  else if (forLight==7)
+  {
+    currentBrightness7 = savedBrightness7;
   }
 }
 
@@ -136,8 +190,24 @@ function powerOff(light) {
 }
 
 function powerOn(light) {
-  sendCommand("d:"+(("0"+light).slice(-2))+":01");
-  setCurrentBrightness(1,light);
+  if (this.dimmable) {
+    // matches the existing (web app) way of doing things
+    sendCommand("d:"+(("0"+light).slice(-2))+":O");
+    restoreCurrentBrightness(light);
+  } else {
+    sendCommand("d:"+(("0"+light).slice(-2))+":01");
+    setCurrentBrightness(1,light);
+  }
+}
+
+function isOn(light) {
+  if (this.dimmable) {
+    return getCurrentBrightness(this.light) != -1;
+  } else {
+    var active = (getCurrentBrightness(this.light) == 1) != this.inverted;
+    this.log("raw: "+getCurrentBrightness(this.light)+", active: "+active+", inverted: "+this.inverted+", light: "+this.light);
+    return active;
+  }
 }
 
 function powerLevel(level,light) {
@@ -173,6 +243,13 @@ function CustomLight(log, config) {
     this.inverted = false;
   }
 
+  if (config["dimmable"] != undefined) {
+    this.log("dimmable from config: "+config["dimmable"]);
+    this.dimmable = config["dimmable"];
+  } else {
+    this.dimmable = false;
+  }
+
   this.service = new Service.Lightbulb(this.name);
   
   this.service
@@ -180,7 +257,7 @@ function CustomLight(log, config) {
     .on('get', this.getState.bind(this))
     .on('set', this.setState.bind(this));
 
-  if (config["dimmable"] != undefined) {
+  if (this.dimmable) {
     this.log("setting up as a dimmable switch");
 
   this.service
@@ -229,10 +306,7 @@ CustomLight.prototype.getState = function(callback) {
 
   queryBrightness(this.light);
 
-  var active = (getCurrentBrightness(this.light) == 1) != this.inverted;
-  this.log("raw: "+getCurrentBrightness(this.light)+", active: "+active+", inverted: "+this.inverted+", light: "+this.light);
-
-  callback(null, (getCurrentBrightness(this.light) == 1) != this.inverted);
+  callback(null, isOn(this.light));
 }
   
 CustomLight.prototype.setState = function(state, callback) {
