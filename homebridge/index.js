@@ -184,13 +184,17 @@ function sendCommand(cmd, callback) {
   });
 }
 
-function powerOff(light) {
+function powerOff(light,dimmable) {
   sendCommand("d:"+(("0"+light).slice(-2))+":__");
-  setCurrentBrightness(-1,light);
+  if (dimmable) {
+    setCurrentBrightness('off',light);
+  } else {
+    setCurrentBrightness(-1,light);
+  }
 }
 
-function powerOn(light) {
-  if (this.dimmable) {
+function powerOn(light,dimmable) {
+  if (dimmable) {
     // matches the existing (web app) way of doing things
     sendCommand("d:"+(("0"+light).slice(-2))+":O");
     restoreCurrentBrightness(light);
@@ -200,13 +204,11 @@ function powerOn(light) {
   }
 }
 
-function isOn(light) {
-  if (this.dimmable) {
-    return getCurrentBrightness(this.light) != -1;
+function isOn(light,dimmable) {
+  if (dimmable) {
+    return getCurrentBrightness(light) != -1;
   } else {
-    var active = (getCurrentBrightness(this.light) == 1) != this.inverted;
-//    this.log("raw: "+getCurrentBrightness(this.light)+", active: "+active+", inverted: "+this.inverted+", light: "+this.light);
-    return active;
+    return getCurrentBrightness(light) == 1;
   }
 }
 
@@ -248,6 +250,13 @@ function CustomLight(log, config) {
     this.dimmable = config["dimmable"];
   } else {
     this.dimmable = false;
+  }
+
+  if (config["switchable"] != undefined) {
+    this.log("switchable from config: "+config["switchable"]);
+    this.switchable = config["switchable"];
+  } else {
+    this.switchable = true;
   }
 
   this.service = new Service.Lightbulb(this.name);
@@ -306,15 +315,30 @@ CustomLight.prototype.getState = function(callback) {
 
   queryBrightness(this.light);
 
-  callback(null, isOn(this.light));
+  if (this.switchable) {
+    if (this.inverted) {
+      callback(null, !isOn(this.light,this.dimmable));
+    } else {
+      callback(null, isOn(this.light,this.dimmable));
+    }
+  } else {
+    var brightness = getCurrentBrightness(this.light);
+    callback(null, brightness<minBrightnessValue);    
+  }
 }
   
 CustomLight.prototype.setState = function(state, callback) {
 
   if (state!=this.inverted) {
-    powerOn(this.light);
+    if (this.switchable) {
+      powerOn(this.light,this.dimmable);
+    }
   } else {
-    powerOff(this.light);
+    if (this.switchable) {
+      powerOff(this.light,this.dimmable);
+    } else if (this.dimmable) {
+      powerLevel(mapBrightness(0),this.light);
+    }
   }
 
   callback(null);
