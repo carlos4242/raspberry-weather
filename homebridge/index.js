@@ -205,7 +205,7 @@ function isOn(light) {
     return getCurrentBrightness(this.light) != -1;
   } else {
     var active = (getCurrentBrightness(this.light) == 1) != this.inverted;
-    this.log("raw: "+getCurrentBrightness(this.light)+", active: "+active+", inverted: "+this.inverted+", light: "+this.light);
+//    this.log("raw: "+getCurrentBrightness(this.light)+", active: "+active+", inverted: "+this.inverted+", light: "+this.light);
     return active;
   }
 }
