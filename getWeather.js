@@ -35,6 +35,7 @@ var greenPin = 22;
 var redPin = "05";
 var whitePin = 17;
 var bluePin = 19;
+var orangePin = 13;
 
 const secondsInAnHour = 3600;
 const secondsInADay = secondsInAnHour*24;
@@ -74,15 +75,23 @@ function waitToFinish() {
 function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp,pi) {
 	fs.exists(gpioPipe, function(exists) {
 		if (exists) {
+			
 			var writableStream = fs.createWriteStream(gpioPipe);
+
 			if (snow) {
 				writableStream.write('s:'+whitePin+':150\n');
-			} else if (alert) {
-				writableStream.write('s:'+whitePin+':15\n');
 			} else if (hail) {
 				writableStream.write('f:'+whitePin+':005\n');
 			} else {
 				writableStream.write('s:'+whitePin+':000\n');
+			}
+
+			if (alert) {
+				writableStream.write('f:'+orangePin+':005\n');
+			} else {
+				writableStream.write('f:'+orangePin+':005\n');
+				// for testing, have flash turned on permanently
+				// writableStream.write('s:'+orangePin+':000\n');
 			}
 
 			if (frost) {
@@ -124,6 +133,7 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 			} else {
 				writableStream.write('s:'+redPin+':000\n');
 			}
+
 			writableStream.end();
 		} else {
 			console.log("Cannot access gpio fifo : "+gpioPipe);
