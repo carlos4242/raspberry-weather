@@ -75,7 +75,7 @@ function waitToFinish() {
 function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp,pi) {
 	fs.exists(gpioPipe, function(exists) {
 		if (exists) {
-			
+
 			var writableStream = fs.createWriteStream(gpioPipe);
 
 			if (snow) {
@@ -293,7 +293,11 @@ function finish() {
 		alerts:alerts
 	}
 
-	fs.writeFile(weatherSummaryFile,JSON.stringify(output, null, 2));
+	fs.writeFile(weatherSummaryFile,JSON.stringify(output, null, 2), function(err) {
+		if (err) {
+			console.log('error writing weather summary : '+err);
+		}
+	});
 	
 	// lastly, output the full weather details if requested
 	if (flags == 'today') {
@@ -301,7 +305,11 @@ function finish() {
 	} else if (flags == 'daily' || flags == 'full') {
 		console.log(JSON.stringify(weather, null, 2));
 	} else if (flags != 'test') {
-		fs.writeFile(testModeFullWeatherDumpFile,data);
+		fs.writeFile(testModeFullWeatherDumpFile, data, function(err) {
+			if (err) {
+				console.log('error writing weather summary : '+err);
+			}
+		});
 	}
 }
 
