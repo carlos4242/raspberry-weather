@@ -89,9 +89,7 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 			if (alert) {
 				writableStream.write('f:'+orangePin+':005\n');
 			} else {
-				writableStream.write('f:'+orangePin+':005\n');
-				// for testing, have flash turned on permanently
-				// writableStream.write('s:'+orangePin+':000\n');
+				writableStream.write('s:'+orangePin+':000\n');
 			}
 
 			if (frost) {
