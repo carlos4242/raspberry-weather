@@ -4,6 +4,7 @@ const dimmerReadableFifoPipeFile = '../dimmer1';
 const dimmerReadableFifoPipeFile2 = '../dimmer2';
 const dimmerReadableFifoPipeFile3 = '../dimmer3';
 const weatherSummaryFile = '../weather.txt';
+const weatherDetailsFile = '../weather.json';
 const accessLogFile = '../access.log';
 const errorLogFile = '../error.log';
 
@@ -199,6 +200,18 @@ app.get('/weather.txt',function(req,res) {
 		}
 		else {
 			res.writeHead(200, { 'Content-Type': 'text/plain' });
+			res.end(content, 'utf-8');
+		}
+	})
+});
+
+app.get('/weather.json',function(req,res) {
+	fs.readFile(weatherDetailsFile, function(error, content) {
+		if (error) {
+			res.status(500).end();
+		}
+		else {
+			res.writeHead(200, { 'Content-Type': 'application/json' });
 			res.end(content, 'utf-8');
 		}
 	})

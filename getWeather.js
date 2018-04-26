@@ -33,7 +33,7 @@ var waitedCount = 0;
 var yellowPin = "04";
 var greenPin = 22;
 var redPin = "05";
-var whitePin = 17;
+var whitePin = 21;
 var bluePin = 19;
 var orangePin = 13;
 
@@ -79,21 +79,23 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 			var writableStream = fs.createWriteStream(gpioPipe);
 
 			if (snow) {
-				writableStream.write('s:'+whitePin+':150\n');
+				writableStream.write('s:'+whitePin+':005\n'); //150
 			} else if (hail) {
 				writableStream.write('f:'+whitePin+':005\n');
 			} else {
 				writableStream.write('s:'+whitePin+':000\n');
 			}
 
-			if (alert) {
+			if ((alert == "watch") || (alert == "warning")) {
 				writableStream.write('f:'+orangePin+':005\n');
+			} else if (alert == "advisory") {
+				writableStream.write('s:'+orangePin+':010\n');
 			} else {
 				writableStream.write('s:'+orangePin+':000\n');
 			}
 
 			if (frost) {
-				writableStream.write('s:'+bluePin+':020\n');
+				writableStream.write('s:'+bluePin+':002\n'); // 020
 			} else if (chill) {
 				writableStream.write('s:'+bluePin+':003\n');
 			} else {
@@ -213,6 +215,38 @@ function describeTemperature(
 	});
 }
 
+function worstAlert(current, test) {
+	// test cannot be false, must be at least "advisory"
+	if ((current == false) || (current = "advisory")) {
+		return test;
+	} else if (current == "warning") {
+		return current; // cannot get any more severe
+	} else if ((current == "watch") && (test == "warning")) {
+		return test;
+	} else {
+		return current;
+	}
+}
+
+function worstAlertToday(alerts, sunrise, sunset) {
+	if (alerts == undefined) {
+		return false;
+	}
+
+	// find the worst active alert "warning" > "watch" > "advisory"
+	var activeAlert = false;
+
+	alerts.forEach(function (alertData) {
+		if ((alertData.time < sunset) && (alertData.time > sunrise)) {
+			activeAlert = worstAlert(activeAlert, alertData.severity);
+		} else if ((alertData.expires < sunset) && (alertData.expires > sunrise)) {
+			activeAlert = worstAlert(activeAlert, alertData.severity);
+		}
+	});
+
+	return activeAlert;
+}
+
 function finish() {
 	var weather = JSON.parse(data);
 	var alerts = weather.alerts;
@@ -225,6 +259,7 @@ function finish() {
 	var sunrise = today.sunriseTime;
 	var sunset = today.sunsetTime;
 	var currentTime = weather.currently.time;
+
 	if (currentTime>sunset) {
 		sunrise = tomorrow.sunriseTime;
 		sunset = tomorrow.sunsetTime;
@@ -248,7 +283,9 @@ function finish() {
 	var snow = precip && pt == 'snow';
 	var hail = precip && pt == 'hail';
 	var icyPrecipitation = sleet|snow|hail;
-	var alert = alerts != undefined;
+
+	var alert = worstAlertToday(alerts, sunrise, sunset);
+
 	var frost = minTemp <= 0;
 	var chill = false;//apparentMin < 4;
 	var now = Math.floor(Date.now() / 1000);
