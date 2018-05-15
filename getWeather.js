@@ -228,7 +228,7 @@ function worstAlert(current, test) {
 	}
 }
 
-function worstAlertToday(alerts, sunrise, sunset) {
+function worstAlertToday(alerts, startDay, endDay) {
 	if (alerts == undefined) {
 		return false;
 	}
@@ -237,9 +237,9 @@ function worstAlertToday(alerts, sunrise, sunset) {
 	var activeAlert = false;
 
 	alerts.forEach(function (alertData) {
-		if ((alertData.time < sunset) && (alertData.time > sunrise)) {
+		if ((alertData.time < endDay) && (alertData.time > startDay)) {
 			activeAlert = worstAlert(activeAlert, alertData.severity);
-		} else if ((alertData.expires < sunset) && (alertData.expires > sunrise)) {
+		} else if ((alertData.expires < endDay) && (alertData.expires > startDay)) {
 			activeAlert = worstAlert(activeAlert, alertData.severity);
 		}
 	});
@@ -259,6 +259,8 @@ function finish() {
 	var sunrise = today.sunriseTime;
 	var sunset = today.sunsetTime;
 	var currentTime = weather.currently.time;
+	var dayStart = today.time;
+	var dayEnd = today.time+3600*24;
 
 	if (currentTime>sunset) {
 		sunrise = tomorrow.sunriseTime;
@@ -284,7 +286,7 @@ function finish() {
 	var hail = precip && pt == 'hail';
 	var icyPrecipitation = sleet|snow|hail;
 
-	var alert = worstAlertToday(alerts, sunrise, sunset);
+	var alert = worstAlertToday(alerts, dayStart, dayEnd);
 
 	var frost = minTemp <= 0;
 	var chill = false;//apparentMin < 4;
@@ -325,7 +327,11 @@ function finish() {
 		sunset:timeFromUnixTime(sunset),
 		minTemp:minTemp,
 		apparentMin:apparentMin,
-		alerts:alerts
+		alerts:alerts,
+		rawSunrise:sunrise,
+		rawSunset:sunset,
+		dayStart:dayStart,
+		dayEnd:dayEnd
 	}
 
 	fs.writeFile(weatherSummaryFile,JSON.stringify(output, null, 2), function(err) {
