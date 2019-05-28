@@ -8,3 +8,5 @@ const char Brightness1Mem[] PROGMEM = "Brightness down"; const char * Brightness
 const char Center2Mem[] PROGMEM = "Center button pressed"; const char * Center2 = &Center2Mem[0];
 
 const char Starting3Mem[] PROGMEM = "Starting..."; const char * Starting3 = & Starting3Mem[0];
+
+const char Another0Mem[] PROGMEM = "Another... test"; const char * Another0 = &Another0Mem[0];

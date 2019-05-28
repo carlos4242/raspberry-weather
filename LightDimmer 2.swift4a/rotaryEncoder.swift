@@ -5,7 +5,8 @@ import AVR
 typealias PinsState = (pin1: Bool, pin2: Bool, centerPin: Bool)
 
 func debounce() {
-  delay(milliseconds: 1)
+  delay(milliseconds
+  : 1)
 }
 
 func checkRotaryEncoder(

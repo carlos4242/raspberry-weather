@@ -14,6 +14,9 @@ let rotaryPin1 = 6
 let rotaryPin2 = 8
 let centerPin = 7
 
+print(message: Another0)
+
+
 // defaults until EEPROM is read
 var delayFactor = 90
 var delayUs: UInt32 = 9000
@@ -29,6 +32,7 @@ func boolForUInt8(_ value: UInt8) -> Bool {
     return false
   }
 }
+
 
 func uint8ForBool(_ value: Bool) -> UInt8 {
   if value {
@@ -114,7 +118,8 @@ func incrementBrightness() {
 
 func decrementBrightness() {
   print(message: Brightness1)
-  updateDelay(delayFactor &- 5)
+  updateDelay(delayFactor &- 5)  
+
 }
 
 func centerPinPressed() {
