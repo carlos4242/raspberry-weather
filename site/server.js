@@ -1,8 +1,9 @@
 // paths
-const gpioWriteableFifoPipeFile = '../flasher';
-const dimmerReadableFifoPipeFile = '../dimmer1';
-const dimmerReadableFifoPipeFile2 = '../dimmer2';
-const dimmerReadableFifoPipeFile3 = '../dimmer3';
+// const gpioWriteableFifoPipeFile = '../flasher';
+// const dimmerReadableFifoPipeFile = '../dimmer1';
+// const dimmerReadableFifoPipeFile2 = '../dimmer2';
+// const dimmerReadableFifoPipeFile3 = '../dimmer3';
+
 const weatherSummaryFile = '../weather.txt';
 const weatherDetailsFile = '../weather.json';
 const accessLogFile = '../access.log';
@@ -19,94 +20,94 @@ var fs = require('fs');
 var currentBrightness = 'unknown';
 var currentBrightness2 = 'unknown';
 var currentBrightness3 = 'unknown';
-var savedBrightness = 0;
-var savedBrightness2 = 0;
-var savedBrightness3 = 0;
+// var savedBrightness = 0;
+// var savedBrightness2 = 0;
+// var savedBrightness3 = 0;
 
 
 if (process.argv.slice(2) == 'daemon') {
 }
 
 
-function sendCommand(cmd) {
-	// send the command request to the arduino (via the gpio daemon)
-	console.log('writing command : '+cmd+' to '+gpioWriteableFifoPipeFile);
-	fs.writeFile(gpioWriteableFifoPipeFile,cmd,{flag:'a'}, function(error) {
-		if (error) {
-			console.log('error writing command : '+error);
-		}
-	});
-}
+// function sendCommand(cmd) {
+// 	// send the command request to the arduino (via the gpio daemon)
+// 	console.log('writing command : '+cmd+' to '+gpioWriteableFifoPipeFile);
+// 	fs.writeFile(gpioWriteableFifoPipeFile,cmd,{flag:'a'}, function(error) {
+// 		if (error) {
+// 			console.log('error writing command : '+error);
+// 		}
+// 	});
+// }
 
-function queryBrightness(light) {
-	// trigger an update to refresh the values for the next time this is called
-	sendCommand("d:"+(("0"+light).slice(-2))+":?");
+// function queryBrightness(light) {
+// 	// trigger an update to refresh the values for the next time this is called
+// 	sendCommand("d:"+(("0"+light).slice(-2))+":?");
 
-	var dimmerValue = Number(fs.readFileSync(dimmerReadableFifoPipeFile));
-	console.log("brightness read as : "+dimmerValue);
+// 	var dimmerValue = Number(fs.readFileSync(dimmerReadableFifoPipeFile));
+// 	console.log("brightness read as : "+dimmerValue);
 
-	var dimmerValue2 = Number(fs.readFileSync(dimmerReadableFifoPipeFile2));
-	console.log("brightness2 read as : "+dimmerValue2);
+// 	var dimmerValue2 = Number(fs.readFileSync(dimmerReadableFifoPipeFile2));
+// 	console.log("brightness2 read as : "+dimmerValue2);
 
-	var dimmerValue3 = Number(fs.readFileSync(dimmerReadableFifoPipeFile3));
-	console.log("brightness3 read as : "+dimmerValue3);
+// 	var dimmerValue3 = Number(fs.readFileSync(dimmerReadableFifoPipeFile3));
+// 	console.log("brightness3 read as : "+dimmerValue3);
 
-	setCurrentBrightness(dimmerValue,1,true);
-	setCurrentBrightness(dimmerValue2,2,true);
-	setCurrentBrightness(dimmerValue3,3,true);
-}
+// 	setCurrentBrightness(dimmerValue,1,true);
+// 	setCurrentBrightness(dimmerValue2,2,true);
+// 	setCurrentBrightness(dimmerValue3,3,true);
+// }
 
-function setCurrentBrightness(b,forLight,andSave) {
-	if (forLight==1) {
-		currentBrightness = b;
-		if (andSave) {
-			savedBrightness = b;
-		}
-	} else if (forLight==2) {
-		currentBrightness2 = b;
-		if (andSave) {
-			savedBrightness2 = b;
-		}
-	} else if (forLight==3) {
-		currentBrightness3 = b;
-		if (andSave) {
-			savedBrightness3 = b;
-		}
-	}
-}
+// function setCurrentBrightness(b,forLight,andSave) {
+// 	if (forLight==1) {
+// 		currentBrightness = b;
+// 		if (andSave) {
+// 			savedBrightness = b;
+// 		}
+// 	} else if (forLight==2) {
+// 		currentBrightness2 = b;
+// 		if (andSave) {
+// 			savedBrightness2 = b;
+// 		}
+// 	} else if (forLight==3) {
+// 		currentBrightness3 = b;
+// 		if (andSave) {
+// 			savedBrightness3 = b;
+// 		}
+// 	}
+// }
 
-function restoreCurrentBrightness(forLight) {
-	if (forLight==1) {
-		currentBrightness = savedBrightness;
-	} else if (forLight==2) {
-		currentBrightness2 = savedBrightness2;
-	} else if (forLight==3) {
-		currentBrightness3 = savedBrightness3;
-	}
-}
+// function restoreCurrentBrightness(forLight) {
+// 	if (forLight==1) {
+// 		currentBrightness = savedBrightness;
+// 	} else if (forLight==2) {
+// 		currentBrightness2 = savedBrightness2;
+// 	} else if (forLight==3) {
+// 		currentBrightness3 = savedBrightness3;
+// 	}
+// }
 
-function powerOff(light) {
-	sendCommand("d:"+(("0"+light).slice(-2))+":_");
-	setCurrentBrightness('off',light,false);
-}
+// function powerOff(light) {
+// 	sendCommand("d:"+(("0"+light).slice(-2))+":_");
+// 	setCurrentBrightness('off',light,false);
+// }
 
-function powerOn(light) {
-	sendCommand("d:"+(("0"+light).slice(-2))+":O");
-	restoreCurrentBrightness(light);
-}
+// function powerOn(light) {
+// 	sendCommand("d:"+(("0"+light).slice(-2))+":O");
+// 	restoreCurrentBrightness(light);
+// }
 
-function powerLevel(level,light) {
-	var level = parseInt(level);
+// function powerLevel(level,light) {
+// 	var level = parseInt(level);
 
-	if (level<0) {
-		level = 0;
-	} else if (level>120) {
-		level = 120;
-	}
+// 	if (level<0) {
+// 		level = 0;
+// 	} else if (level>120) {
+// 		level = 120;
+// 	}
 
-	setCurrentBrightness(level,light,true);
-	sendCommand("d:"+(("0"+light).slice(-2))+":"+(("0"+level).slice(-3)));
-}
+// 	setCurrentBrightness(level,light,true);
+// 	sendCommand("d:"+(("0"+light).slice(-2))+":"+(("0"+level).slice(-3)));
+// }
 
 console.log('attempting to start http server...');
 
@@ -136,15 +137,15 @@ app.use('/res',express.static(__dirname + '/res'));
 
 app.get('/', function(req, res) {
 	console.log('serving site');
-	queryBrightness();
+	// queryBrightness();
 
-	if (currentBrightness<0) {
+	// if (currentBrightness<0) {
 		lamp1On = false;
 		lamp1Brightness = 90;
-	} else {
-		lamp1On = true;
-		lamp1Brightness = currentBrightness;		
-	}
+	// } else {
+	// 	lamp1On = true;
+	// 	lamp1Brightness = currentBrightness;		
+	// }
 
 	console.log('lamp1Brightness : '+lamp1Brightness);
 
@@ -167,31 +168,31 @@ app.get('/', function(req, res) {
 	res.end();
 });
 
-app.get('/light', function(req,res) {
-	if (req.query.light != undefined) {
-		var light = Number(req.query.light);
-	} else {
-		light = 1;
-	}
+// app.get('/light', function(req,res) {
+// 	if (req.query.light != undefined) {
+// 		var light = Number(req.query.light);
+// 	} else {
+// 		light = 1;
+// 	}
 
-	console.log('light read as : '+light);
+// 	console.log('light read as : '+light);
 
-	if (req.query.power == 'on') {
-		powerOn(light);
-		res.end();
-	} else if (req.query.power == 'off') {
-		powerOff(light);
-		res.end();
-	} else if (req.query.powerLevel != undefined) {
-		console.log('powerLevel read as : '+req.query.powerLevel);
-		powerLevel(req.query.powerLevel,light);
-		res.end();
-	} else {
-		queryBrightness(light);
-		res.writeHead(200, { 'Content-Type': 'application/json' });
-		res.end(JSON.stringify({"light":currentBrightness,"light2":currentBrightness2,"light3":currentBrightness3}));
-	}
-});
+// 	if (req.query.power == 'on') {
+// 		powerOn(light);
+// 		res.end();
+// 	} else if (req.query.power == 'off') {
+// 		powerOff(light);
+// 		res.end();
+// 	} else if (req.query.powerLevel != undefined) {
+// 		console.log('powerLevel read as : '+req.query.powerLevel);
+// 		powerLevel(req.query.powerLevel,light);
+// 		res.end();
+// 	} else {
+// 		queryBrightness(light);
+// 		res.writeHead(200, { 'Content-Type': 'application/json' });
+// 		res.end(JSON.stringify({"light":currentBrightness,"light2":currentBrightness2,"light3":currentBrightness3}));
+// 	}
+// });
 
 app.get('/weather.txt',function(req,res) {
 	fs.readFile(weatherSummaryFile, function(error, content) {

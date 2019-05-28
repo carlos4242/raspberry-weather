@@ -66,17 +66,21 @@ def printTextString(x,y,text):
 
 hours = 24
 tempRange = 20
+tempOffset = 3
 
 hourStep = (right-left)/hours
 tempStep = (bottom-top)/tempRange
+
+baseline=bottom-tempOffset*tempStep
+# draw.line((left,baseline,right,baseline), fill=100)
 
 for h in range(0, hours-1):
 	t0 = temps.get(str(h),-255)
 	t1 = temps.get(str(h+1),-255)
 	x0=h*hourStep
 	x1=x0+hourStep
-	y0=bottom-(t0-5)*tempStep
-	y1=bottom-(t1-5)*tempStep
+	y0=bottom-(t0+tempOffset)*tempStep
+	y1=bottom-(t1+tempOffset)*tempStep
 	if t0>-255 and t1>-255:
 		draw.line((x0,y0,x1,y1), fill=255)
 		if h==highTempHour:
