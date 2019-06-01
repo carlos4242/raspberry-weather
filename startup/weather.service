@@ -1,0 +1,17 @@
+[Unit]
+Description=Initialise the weather at startup
+Before=shutdown.target
+After=local-fs.target network-online.target flasher.service
+Requires=flasher.service
+Wants=network-online.target
+Conflicts=shutdown.target
+
+[Service]
+WorkingDirectory=/home/carlpeto/node
+Type=oneshot
+User=carlpeto
+TimeoutSec=5min
+ExecStart=/home/carlpeto/node/getWeather.js startup
+
+[Install]
+WantedBy=multi-user.target

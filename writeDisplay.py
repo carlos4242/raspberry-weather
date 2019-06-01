@@ -6,7 +6,7 @@ import time
 import os
 import json
 
-import Adafruit_GPIO.SPI as SPI
+# import Adafruit_GPIO.SPI as SPI
 import Adafruit_SSD1306
 
 from PIL import Image
@@ -66,7 +66,7 @@ def printTextString(x,y,text):
 
 hours = 24
 tempRange = 20
-tempOffset = 3
+tempOffset = -10
 
 hourStep = (right-left)/hours
 tempStep = (bottom-top)/tempRange

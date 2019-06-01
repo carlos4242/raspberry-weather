@@ -3,7 +3,8 @@
 // poll the weather service
 // look for sunshine, clouds, rain, alerts, night and day
 
-// paths, etc.
+
+/* CONSTANTS */
 const darkSkyServer = "https://api.forecast.io";
 const darkSkyAPIPath = "/forecast";
 const weatherSummaryFile = "weather.txt";
@@ -12,8 +13,13 @@ const gpioPipe = "flasher";
 const oledDisplayTextFile = 'disp.json';
 const oledTempsArrayFile = 'temp.json';
 const testModeFullWeatherDumpFile = 'weather.json';
+const secondsInAnHour = 3600;
+const secondsInADay = secondsInAnHour*24;
 
+
+/* GLOBAL VARIABLES */
 var writeOLEDDisplayScript = __dirname + "/writeDisplay.py";
+var splashScreenDisplayScript = __dirname + "/image.py";
 
 var http = require('https');
 var fs = require('fs');
@@ -37,21 +43,10 @@ var whitePin = 21;
 var bluePin = 19;
 var orangePin = 13;
 
-const secondsInAnHour = 3600;
-const secondsInADay = secondsInAnHour*24;
 
-var clientRequest = http.get(weatherUrl).on('error', function(e) {
-	console.log("Got error: " + e.message);
-	finished = true;
-});
 
-clientRequest.on('response', function(res2) {
-	res2.on('data', function (chunk) {
-		data += chunk;
-	}).on('end', function() {
-		finished = true;
-	});
-});
+
+/* FUNCTIONS */
 
 function waitToFinish() {
 	if (finished) {
@@ -142,12 +137,13 @@ function writeLights(cloudy,sunny,rain,alert,snow,hail,frost,chill,cloudCover,pp
 }
 
 
-function printDisplayMessage(env) {
+function runScriptHelper(script, dir, env) {
 	var exec = require('child_process').exec;
 	var options = {};
-	options["cwd"] = __dirname;
+	// console.log("run: "+script+" in: "+dir);
+	options["cwd"] = dir;
 	options["env"] = env;
-	exec(writeOLEDDisplayScript, options, function(error, stdout, stderr) {
+	exec(script, options, function(error, stdout, stderr) {
 	  if (error) {
 	    console.error('exec error: '+error);
 	    return;
@@ -208,7 +204,7 @@ function describeTemperature(
 				if (err) {
 					console.log('coult not write OLED temps array file : '+oledTempsArrayFile);
 				} else {
-					printDisplayMessage({});
+					runScriptHelper(writeOLEDDisplayScript, __dirname, {});
 				}
 			});
 		}
@@ -354,6 +350,42 @@ function finish() {
 	}
 }
 
+function showAllFunctions() {
+	fs.exists(gpioPipe, function(exists) {
+		if (exists) {
+			var writableStream = fs.createWriteStream(gpioPipe);
+			writableStream.write('s:'+yellowPin+':255\n');
+			writableStream.write('s:'+greenPin+':255\n');
+			writableStream.write('s:'+redPin+':255\n');
+			writableStream.write('s:'+whitePin+':255\n');
+			writableStream.write('s:'+bluePin+':255\n');
+			writableStream.write('s:'+orangePin+':255\n');
+			writableStream.end();
+		} else {
+			console.log("Cannot access gpio fifo : "+gpioPipe);
+		}
+	});
+
+	runScriptHelper(splashScreenDisplayScript, __dirname, {});
+}
+
+function requestWeather() {
+	var clientRequest = http.get(weatherUrl).on('error', function(e) {
+		console.log("Got error: " + e.message);
+		finished = true;
+	});
+
+	clientRequest.on('response', function(res2) {
+		res2.on('data', function (chunk) {
+			data += chunk;
+		}).on('end', function() {
+			finished = true;
+		});
+	});
+}
+
+/* MAIN PROGRAM */
+
 if (flags == 'test') {
 	fs.readFile(testModeFullWeatherDumpFile,function(err,fileContents) {
 		if (err) {
@@ -364,5 +396,15 @@ if (flags == 'test') {
 		}
 	});
 } else {
+	if (flags == 'startup') {
+		showAllFunctions();
+
+		setTimeout(function() {
+			requestWeather();
+		},5000);
+	} else {
+		requestWeather();
+	}
+
 	waitToFinish();
 }

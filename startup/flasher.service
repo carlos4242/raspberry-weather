@@ -1,0 +1,16 @@
+[Unit]
+Description=GPIO pins LED PWM controller
+Before=shutdown.target
+After=local-fs.target network-online.target
+Wants=network-online.target
+Conflicts=shutdown.target
+
+[Service]
+Type=forking
+User=carlpeto
+TimeoutSec=5min
+ExecStart=/home/carlpeto/node/directGpio/directGpio
+WorkingDirectory=/home/carlpeto/node
+
+[Install]
+WantedBy=multi-user.target
