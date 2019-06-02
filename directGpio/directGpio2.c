@@ -196,6 +196,7 @@ void *flasher(void *pptr)
       bool currentValue = GPIO_READ(pin->pin);
       bool oldValue = pin->lastState;
       if (currentValue != oldValue && pin->rising == currentValue) {
+        daemonLog("pin edge detected, sending SIGHUP to %d\n",pin->trackingPid);
         kill(pin->trackingPid, SIGHUP);
       }
     } else if (!pin->flashPeriod && pin->brightness<FLT_EPSILON) {
@@ -557,6 +558,7 @@ void doControlMessage(char * message) {
             pins[pin].lastState = false;
             pins[pin].rising = true;
             pins[pin].trackingPid = newParameter;
+            daemonLog("parameter is %s, interpreted as pid for edge signals %d\n",message,pins[pin].trackingPid);
           }
           
           if (!pins[pin].thread) {
