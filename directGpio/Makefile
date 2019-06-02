@@ -13,6 +13,9 @@ directGpio: directGpio.c
 macTests: directGpio.c
 	gcc -std=gnu99 $^ -lm -lpthread -Dmac=1 -o $@
 
+macTests2: directGpio2.c
+	gcc -std=gnu99 $^ -lm -lpthread -Dmac=1 -o $@
+
 macClang: directGpio.c
 	clang -g -std=gnu99 $^ -lm -lpthread -Dmac=1 -o $@
 
