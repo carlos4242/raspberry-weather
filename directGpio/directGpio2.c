@@ -837,10 +837,10 @@ void showHelp(char * executableFilename) {
   printf("--disable log     : do not log anything (has no effect if running in foreground).\n");
   
   printf("\n\n");
-  printf("To control a running daemon: echo (p|s|f):XX:YYY > <control fifo>\n");
-  printf("s - steady LED brightness, f - flashing LED, p - power on/off (for relays)\n");
+  printf("To control a running daemon: echo (p|s|f|i):XX:YYY > <control fifo>\n");
+  printf("s - steady LED brightness, f - flashing LED, p - power on/off (for relays), i - edge detect\n");
   printf("XX - pin number 0-%d\n",NUM_PINS);
-  printf("YYY - brightness (0-255), flash period in 10ths of a second (1-999) or 1/0 if simple power control\n");
+  printf("YYY - brightness (0-255), flash period in 10ths of a second (1-999), 1/0 if simple power control or pid to signal edges\n");
   printf("SIGHUP, SIGINT or SIGTERM to cleanly shut down the daemon\n");
   printf("\n---\n");
   printf("For dimmer control, send commands to the control fifo, like 1:99, to set brightness of dimmer 1 to 99.\n");
