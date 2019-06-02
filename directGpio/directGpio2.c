@@ -146,8 +146,13 @@ void daemonLog(const char* format, ...) {
 void logStats(FILE * file) {
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
     if (pins[pin].thread) {
-      fprintf(file,"pin %d : flash = %lu, brightness = %.0f, power = %d\n",
-        pin,(unsigned long)pins[pin].flashPeriod,pins[pin].brightness,pins[pin].powerOn);
+      if (pins[pin].inputEdgeDetect) {
+        fprintf(file,"pin %d : rising = %d, lastState = %d, pid = %d\n",
+          pin,pins[pin].rising,pins[pin].lastState,pins[pin].trackingPid);
+      } else {
+        fprintf(file,"pin %d : flash = %lu, brightness = %.0f, power = %d\n",
+          pin,(unsigned long)pins[pin].flashPeriod,pins[pin].brightness,pins[pin].powerOn);
+      }
     }
   }
 }
