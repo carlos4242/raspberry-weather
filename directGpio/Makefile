@@ -10,6 +10,9 @@ endif
 directGpio: directGpio.c
 	gcc -std=gnu99 $^ -lm -lPJ_RPI -lpthread -o $@
 
+directGpio2: directGpio2.c
+	gcc -std=gnu99 $^ -lm -lPJ_RPI -lpthread -o $@
+
 macTests: directGpio.c
 	gcc -std=gnu99 $^ -lm -lpthread -Dmac=1 -o $@
 
@@ -23,4 +26,4 @@ macClangLLVM: directGpio.c
 	clang -S -emit-llvm -O3 -std=gnu99 $^ -Dmac=1
 
 clean:
-	rm -f *.o directGpio macTests macClang*
+	rm -f *.o directGpio macTests directGpio2 macTests2 macClang*

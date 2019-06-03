@@ -556,9 +556,9 @@ void doControlMessage(char * message) {
             pins[pin].brightness=0;
             daemonLog("parameter is %s, interpreted as power on %d\n",message,pins[pin].powerOn);
           } else if (interruptOnEdgeMsg) {
-            pins[pin].powerOn=0;
-            pins[pin].flashPeriod=0;
-            pins[pin].brightness=0;
+            pins[pin].powerOn=1;
+            pins[pin].flashPeriod=1;
+            pins[pin].brightness=1;
             pins[pin].inputEdgeDetect = true;
             pins[pin].lastState = false;
             pins[pin].rising = true;
