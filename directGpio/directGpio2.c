@@ -203,8 +203,12 @@ void *flasher(void *pptr)
       bool oldValue = pin->lastState;
       if (currentValue != oldValue && pin->rising == currentValue) {
         daemonLog("pin edge detected, sending SIGHUP to %d\n",pin->trackingPid);
-        kill(pin->trackingPid, SIGHUP);
+        if (kill(pin->trackingPid, SIGHUP)) {
+          // signal transmit failed
+          daemonLog("error, sending SIGHUP: %s\n",strerror(errno));
+        }
       }
+      pin->lastState = currentValue;
     } else if (!pin->flashPeriod && pin->brightness<FLT_EPSILON) {
       // we are not flashing or steady, do nothing much, then wait for next cycle
       if (pin->powerOn) {
