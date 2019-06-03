@@ -11,6 +11,7 @@
 #define GPIO_SET int dummy
 #define INP_GPIO(x) 
 #define OUT_GPIO(x) 
+#define GPIO_READ(g) 1
 
 #endif
 
@@ -34,6 +35,7 @@
 #include <termios.h>
 
 #define CMD_BUF 1024
+#define MAX_CMD_LEN 100 // doesn't matter much, just short
 
 // limits
 #define NUM_PINS 26
@@ -80,6 +82,11 @@ typedef struct {
   useconds_t flashPeriod;
   float brightness;
   bool powerOn; // only used if brightness is ~0 and flashPeriod is 0
+  // input edge detect
+  bool inputEdgeDetect;
+  bool lastState;
+  bool rising; // true = rising edge signals, false = falling edge signals
+  pid_t trackingPid; // signalled on detect rising edge
 } pin_t;
 pin_t pins[NUM_PINS] = {0};
 
@@ -140,8 +147,13 @@ void daemonLog(const char* format, ...) {
 void logStats(FILE * file) {
   for (unsigned char pin = MIN_PIN;pin<NUM_PINS;pin++) {
     if (pins[pin].thread) {
-      fprintf(file,"pin %d : flash = %lu, brightness = %.0f, power = %d\n",
-        pin,(unsigned long)pins[pin].flashPeriod,pins[pin].brightness,pins[pin].powerOn);
+      if (pins[pin].inputEdgeDetect) {
+        fprintf(file,"pin %d : rising = %d, lastState = %d, pid = %d\n",
+          pin,pins[pin].rising,pins[pin].lastState,pins[pin].trackingPid);
+      } else {
+        fprintf(file,"pin %d : flash = %lu, brightness = %.0f, power = %d\n",
+          pin,(unsigned long)pins[pin].flashPeriod,pins[pin].brightness,pins[pin].powerOn);
+      }
     }
   }
 }
@@ -186,7 +198,19 @@ void *flasher(void *pptr)
   daemonLog("started thread for pin %d\n",pin->pin);
   while(keepRunning) // each run of the loop should take one duty cycle... i.e. 100Hz
   {
-    if (!pin->flashPeriod && pin->brightness<FLT_EPSILON) {
+    if (pin->inputEdgeDetect) {
+      bool currentValue = GPIO_READ(pin->pin);
+      bool oldValue = pin->lastState;
+      if (currentValue != oldValue && pin->rising == currentValue) {
+        daemonLog("pin edge detected, sending SIGHUP to %d\n",pin->trackingPid);
+        if (kill(pin->trackingPid, SIGHUP)) {
+          // signal transmit failed
+          daemonLog("error, sending SIGHUP: %s\n",strerror(errno));
+        }
+      }
+      pin->lastState = currentValue;
+      usleep(dutyCycle);
+    } else if (!pin->flashPeriod && pin->brightness<FLT_EPSILON) {
       // we are not flashing or steady, do nothing much, then wait for next cycle
       if (pin->powerOn) {
         GPIO_SET = 1 << pin->pin;
@@ -234,10 +258,10 @@ void *flasher(void *pptr)
 
 // thread dimmer FIFO reporter routine
 // endless loop until we shut down
-// takes the dummer number from the context, creates a FIFO in /tmp called /tmp/dimmerXX
+// takes the dimmer number from the context, creates a FIFO in /tmp called /tmp/dimmerXX
 // does a blocking open for write
 // when the other end of the FIFO is opened for read by another process, writes out the current state of this dimmer
-// plus newcline
+// plus newline
 // then closes
 // and loops back again to do a blocking open for write
 // signal control...
@@ -428,10 +452,10 @@ Setup/cleanup routines (including signal handling).
 // __ ... next part must be two digits
 
 bool isValid(char * message) {
-  // this checks that the remainder of a message conforms to 00:000\0
+  // this checks that the remainder of a message conforms to 00:00000..\0
   // or 00:X\0
   // where X is a valid controlling character, e.g. ? or _ or O
-  if (strnlen(message,6)<4) return false;
+  if (strnlen(message,MAX_CMD_LEN)<4) return false;
   if (message[0]<'0'||message[0]>'9') return false;
   if (message[1]<'0'||message[1]>'9') return false;
   if (message[2]!=':') return false;
@@ -444,10 +468,11 @@ void doControlMessage(char * message) {
   bool flashMsg=strncmp(message,"f:",2)==0;
   bool relayControlMsg=strncmp(message,"p:",2)==0;
   bool dimmerMsg=strncmp(message,"d:",2)==0&&enableDimmer;
-  if (steadyMsg||flashMsg||relayControlMsg||dimmerMsg) { 
+  bool interruptOnEdgeMsg=strncmp(message,"i:",2)==0;
+  if (steadyMsg||flashMsg||relayControlMsg||dimmerMsg||interruptOnEdgeMsg) { 
     message+=2;
-    message[6]=0;
-    daemonLog("... message (%d) %s\n",strnlen(message,6),message);
+    // message[6]=0;
+    daemonLog("... message (%d) %s\n",strnlen(message,MAX_CMD_LEN),message);
     if (isValid(message)) { // make sure the message must conform to 00:X ... where 00 is digis only and X is digits or a letter
       char pinBuf[3]={0};// initialise a string buffer with 0
       strncpy(pinBuf,message,2); // copy two bytes so the third is automatically the string terminator
@@ -513,7 +538,15 @@ void doControlMessage(char * message) {
         
         if (pin >= MIN_PIN && pin < NUM_PINS) {
           INP_GPIO(pin);
-          OUT_GPIO(pin); // Define pin as output
+
+          if (!interruptOnEdgeMsg) {
+            OUT_GPIO(pin); // Define pin as output            
+            pins[pin].inputEdgeDetect = false;
+            pins[pin].lastState = false;
+            pins[pin].rising = false;
+            pins[pin].trackingPid = 0;
+          }
+
           if (steadyMsg) {
             pins[pin].flashPeriod=0;
             pins[pin].brightness=fmaxf(fminf((float)newParameter,maxBrightness),minBrightness);
@@ -528,6 +561,16 @@ void doControlMessage(char * message) {
             pins[pin].flashPeriod=0;
             pins[pin].brightness=0;
             daemonLog("parameter is %s, interpreted as power on %d\n",message,pins[pin].powerOn);
+          } else if (interruptOnEdgeMsg) {
+            pins[pin].powerOn=1;
+            pins[pin].flashPeriod=1;
+            pins[pin].brightness=1;
+            pins[pin].inputEdgeDetect = true;
+            pins[pin].lastState = false;
+            pins[pin].rising = true;
+            pid_t realPid = atoi(message); // conversion to unsigned char for other cases had lost precision
+            pins[pin].trackingPid = realPid;
+            daemonLog("parameter is %s, interpreted as pid for edge signals %d\n",message,pins[pin].trackingPid);
           }
           
           if (!pins[pin].thread) {
@@ -542,7 +585,7 @@ void doControlMessage(char * message) {
         dumpStatsFile();
       }
     } else {
-      daemonLog("invalid control message - should be XX:Y or XX:YY or XX:YYY (XX=pin,Y[Y[Y]]=action) was %s\n",message);
+      daemonLog("invalid control message - should be XX:Y or XX:YY or XX:YYY... (XX=pin,Y[Y[Y]...]=action) was %s\n",message);
     }
   }
 }
@@ -801,10 +844,10 @@ void showHelp(char * executableFilename) {
   printf("--disable log     : do not log anything (has no effect if running in foreground).\n");
   
   printf("\n\n");
-  printf("To control a running daemon: echo (p|s|f):XX:YYY > <control fifo>\n");
-  printf("s - steady LED brightness, f - flashing LED, p - power on/off (for relays)\n");
+  printf("To control a running daemon: echo (p|s|f|i):XX:YYY > <control fifo>\n");
+  printf("s - steady LED brightness, f - flashing LED, p - power on/off (for relays), i - edge detect\n");
   printf("XX - pin number 0-%d\n",NUM_PINS);
-  printf("YYY - brightness (0-255), flash period in 10ths of a second (1-999) or 1/0 if simple power control\n");
+  printf("YYY - brightness (0-255), flash period in 10ths of a second (1-999), 1/0 if simple power control or pid to signal edges\n");
   printf("SIGHUP, SIGINT or SIGTERM to cleanly shut down the daemon\n");
   printf("\n---\n");
   printf("For dimmer control, send commands to the control fifo, like 1:99, to set brightness of dimmer 1 to 99.\n");

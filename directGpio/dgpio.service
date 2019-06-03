@@ -9,8 +9,9 @@ Conflicts=shutdown.target
 Type=forking
 User=carlpeto
 TimeoutSec=5min
-ExecStart=/home/carlpeto/node/directGpio/directGpio
-WorkingDirectory=/home/carlpeto/node
+LimitCORE=infinity
+ExecStart=/usr/local/bin/dgpio -f /var/run/dgpio -d /var/log/dgpio.stats -l /var/log/dgpio.log --disable dimmer
+WorkingDirectory=/
 
 [Install]
 WantedBy=multi-user.target

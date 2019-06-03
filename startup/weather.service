@@ -1,8 +1,8 @@
 [Unit]
 Description=Initialise the weather at startup
 Before=shutdown.target
-After=local-fs.target network-online.target flasher.service
-Requires=flasher.service
+After=local-fs.target network-online.target dgpio.service
+Requires=dgpio.service
 Wants=network-online.target
 Conflicts=shutdown.target
 

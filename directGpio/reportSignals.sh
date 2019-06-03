@@ -1,15 +1,17 @@
 #! /bin/bash
 
-function report {
+function toggle {
 	echo "SIGHUP"
+
+	if (exit $(($(i2cget -y 1 0x23 0x07))))
+	then
+	  i2cset -y 1 0x23 0x07 01
+	else
+		i2cset -y 1 0x23 0x07 00
+	fi
 }
 
-function intr {
-	echo "SIGINT"
-}
-
-trap report SIGHUP
-#trap intr SIGINT
+trap toggle SIGHUP
 
 while true
 do
