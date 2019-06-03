@@ -563,7 +563,8 @@ void doControlMessage(char * message) {
             pins[pin].inputEdgeDetect = true;
             pins[pin].lastState = false;
             pins[pin].rising = true;
-            pins[pin].trackingPid = newParameter;
+            pid_t realPid = atoi(message); // conversion to unsigned char for other cases had lost precision
+            pins[pin].trackingPid = realPid;
             daemonLog("parameter is %s, interpreted as pid for edge signals %d\n",message,pins[pin].trackingPid);
           }
           
