@@ -35,6 +35,7 @@
 #include <termios.h>
 
 #define CMD_BUF 1024
+#define MAX_CMD_LEN 100 // doesn't matter much, just short
 
 // limits
 #define NUM_PINS 26
@@ -446,10 +447,10 @@ Setup/cleanup routines (including signal handling).
 // __ ... next part must be two digits
 
 bool isValid(char * message) {
-  // this checks that the remainder of a message conforms to 00:000\0
+  // this checks that the remainder of a message conforms to 00:00000..\0
   // or 00:X\0
   // where X is a valid controlling character, e.g. ? or _ or O
-  if (strnlen(message,6)<4) return false;
+  if (strnlen(message,MAX_CMD_LEN)<4) return false;
   if (message[0]<'0'||message[0]>'9') return false;
   if (message[1]<'0'||message[1]>'9') return false;
   if (message[2]!=':') return false;
@@ -465,8 +466,8 @@ void doControlMessage(char * message) {
   bool interruptOnEdgeMsg=strncmp(message,"i:",2)==0;
   if (steadyMsg||flashMsg||relayControlMsg||dimmerMsg||interruptOnEdgeMsg) { 
     message+=2;
-    message[6]=0;
-    daemonLog("... message (%d) %s\n",strnlen(message,6),message);
+    // message[6]=0;
+    daemonLog("... message (%d) %s\n",strnlen(message,MAX_CMD_LEN),message);
     if (isValid(message)) { // make sure the message must conform to 00:X ... where 00 is digis only and X is digits or a letter
       char pinBuf[3]={0};// initialise a string buffer with 0
       strncpy(pinBuf,message,2); // copy two bytes so the third is automatically the string terminator
@@ -578,7 +579,7 @@ void doControlMessage(char * message) {
         dumpStatsFile();
       }
     } else {
-      daemonLog("invalid control message - should be XX:Y or XX:YY or XX:YYY (XX=pin,Y[Y[Y]]=action) was %s\n",message);
+      daemonLog("invalid control message - should be XX:Y or XX:YY or XX:YYY... (XX=pin,Y[Y[Y]...]=action) was %s\n",message);
     }
   }
 }
@@ -837,10 +838,10 @@ void showHelp(char * executableFilename) {
   printf("--disable log     : do not log anything (has no effect if running in foreground).\n");
   
   printf("\n\n");
-  printf("To control a running daemon: echo (p|s|f):XX:YYY > <control fifo>\n");
-  printf("s - steady LED brightness, f - flashing LED, p - power on/off (for relays)\n");
+  printf("To control a running daemon: echo (p|s|f|i):XX:YYY > <control fifo>\n");
+  printf("s - steady LED brightness, f - flashing LED, p - power on/off (for relays), i - edge detect\n");
   printf("XX - pin number 0-%d\n",NUM_PINS);
-  printf("YYY - brightness (0-255), flash period in 10ths of a second (1-999) or 1/0 if simple power control\n");
+  printf("YYY - brightness (0-255), flash period in 10ths of a second (1-999), 1/0 if simple power control or pid to signal edges\n");
   printf("SIGHUP, SIGINT or SIGTERM to cleanly shut down the daemon\n");
   printf("\n---\n");
   printf("For dimmer control, send commands to the control fifo, like 1:99, to set brightness of dimmer 1 to 99.\n");
