@@ -1,0 +1,17 @@
+[Unit]
+Description=Corner Lamp Button Press Service
+Before=shutdown.target
+After=local-fs.target network-online.target dgpio.service
+Requires=dgpio.service
+Wants=network-online.target
+Conflicts=shutdown.target
+
+[Service]
+ExecStart=/home/carlpeto/node/lightButtonPress.sh
+User=carlpeto
+TimeoutSec=5min
+WorkingDirectory=/home/carlpeto/node
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=Fairy Lights Button
+Before=shutdown.target
+After=local-fs.target network-online.target dgpio.service
+Requires=dgpio.service
+Wants=network-online.target
+Conflicts=shutdown.target
+
+[Service]
+ExecStart=/home/carlpeto/node/fairyButtonPress.sh
+User=dgpio
+TimeoutSec=5min
+WorkingDirectory=/home/carlpeto/node
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
