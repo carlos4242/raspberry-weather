@@ -2,7 +2,6 @@ import AVR
 typealias IntegerLiteralType = UInt8
 
 SetupSerial(baudRate: 9600)
-print(message: Starting3)
 
 // configuration constants
 let triacPin = 4
@@ -14,8 +13,16 @@ let rotaryPin1 = 6
 let rotaryPin2 = 8
 let centerPin = 7
 
-print(message: Another0)
+// pin state remembers the most recent states of the lines from the rotary encoder
+var lastPinState: PinsState = (false, false, false)
 
+// the delay factor is a UInt8 value that is easy to handle, as an I2C variable, etc.
+// it is simply multiplied by 100 to get the number of microseconds to wait after
+// a zero cross is detected before firing the triac
+// in my experiments, values less than 500us seem to be unstable
+// likewise, although theoretically a mains cycle (in the UK) is 10ms, 10,000us...
+// values greater than 9000us seem to cause instability so I've clipped boundary
+// between 5-90 for delay factor, corresponding to .5ms - 9ms
 
 // defaults until EEPROM is read
 var delayFactor = 90
@@ -61,6 +68,7 @@ func i2cRead(register: UInt8) -> UInt8 {
 }
 
 // the update function, calcs and storage
+// the de
 func updateDelay(_ newDelayFactorIn: UInt8) {
   var newDelayFactor = newDelayFactorIn
 
@@ -89,8 +97,6 @@ func updateEnabled(_ newEnabled: Bool) {
 updateDelay(readEEPROM(address: storedBrightnessLocation))
 enabled = boolForUInt8(readEEPROM(address: storedOnOffLocation))
 
-
-
 // the core of the program, a delayed triac fire a set time after zero cross
 setupPin2InterruptCallback(edgeType: RISING_EDGE) {
   setupTimerSingleShotInterruptCallback(microseconds: delayUs) {
@@ -112,41 +118,26 @@ i2cSlaveSetupRegisterSendCallback { register -> UInt8 in
 setupI2CSlave(address: 0x23)
 
 func incrementBrightness() {
-  print(message: Brightness0)
   updateDelay(delayFactor &+ 5)
 }
 
 func decrementBrightness() {
-  print(message: Brightness1)
-  updateDelay(delayFactor &- 5)  
-
+  updateDelay(delayFactor &- 5)
 }
 
 func centerPinPressed() {
-  print(message: Center2)
-//  updateEnabled(!enabled)
+  updateEnabled(!enabled)
 }
-
-//var lastPinState: PinsState = (false, false, false)
-//
-//pinMode(pin: rotaryPin1, mode: INPUT)
-//digitalWrite(pin: rotaryPin1, value: HIGH)
-//pinMode(pin: rotaryPin2, mode: INPUT)
-//digitalWrite(pin: rotaryPin2, value: HIGH)
-//pinMode(pin: centerPin, mode: INPUT)
-//digitalWrite(pin: centerPin, value: HIGH)
-
-print(message: Started1)
 
 while (true) {
 
-//  checkRotaryEncoder(
-//    pin1: rotaryPin1,
-//    pin2: rotaryPin2,
-//    centerPin: centerPin,
-//    lastPinState: &lastPinState,
-//    clockwise: incrementBrightness,
-//    counterclockwise: decrementBrightness,
-//    centerPinPressed: centerPinPressed)
+  checkRotaryEncoder(
+    pin1: rotaryPin1,
+    pin2: rotaryPin2,
+    centerPin: centerPin,
+    lastPinState: &lastPinState,
+    clockwise: incrementBrightness,
+    counterclockwise: decrementBrightness,
+    centerPinPressed: centerPinPressed)
 
 }
