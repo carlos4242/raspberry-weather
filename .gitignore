@@ -1,3 +1,7 @@
+*.swift4a/*.ll
+*.swift4a/*.s
+*.swift4a/*.hex
+*.swift4a/*.txt
 .DS_Store
 forever
 flasher.log

@@ -115,7 +115,7 @@ i2cSlaveSetupRegisterSendCallback { register -> UInt8 in
   return i2cRead(register: register)
 }
 
-setupI2CSlave(address: 0x23)
+setupI2CSlave(address: 0x23, activatePullups: false)
 
 func incrementBrightness() {
   updateDelay(delayFactor &+ 5)
