@@ -10,8 +10,8 @@ let storedOnOffLocation: UInt16 = 35
 let brightnessi2cRegister = 6
 let onOffi2cRegister = 7
 let rotaryPin1 = 6
-let rotaryPin2 = 8
-let centerPin = 7
+let rotaryPin2 = 7
+let centerPin = 8
 
 // pin state remembers the most recent states of the lines from the rotary encoder
 var lastPinState: PinsState = (false, false, false)
